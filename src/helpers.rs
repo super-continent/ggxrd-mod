@@ -1,13 +1,16 @@
 use std::ffi::OsStr;
-use std::mem;
 use std::os::windows::ffi::OsStrExt;
 
-use winapi::ctypes::c_int;
-use winapi::shared::{minwindef::*, windef::HWND};
-use winapi::um::winnt::LONG;
-use winapi::um::winuser::{
-    CallWindowProcA, CallWindowProcW, GetWindowLongA, GetWindowLongPtrA, GetWindowLongPtrW,
-    GetWindowLongW, IsWindowUnicode, SetWindowLongPtrA, SetWindowLongPtrW, GWLP_WNDPROC, WNDPROC,
+use winapi::{
+    ctypes::c_int,
+    shared::{minwindef::*, windef::HWND},
+    um::{
+        winnt::LONG,
+        winuser::{
+            CallWindowProcA, CallWindowProcW, GetWindowLongA, GetWindowLongW, IsWindowUnicode,
+            SetWindowLongPtrA, SetWindowLongPtrW, WNDPROC,
+        },
+    },
 };
 
 #[macro_export]
