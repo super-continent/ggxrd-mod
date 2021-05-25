@@ -24,22 +24,6 @@ pub unsafe fn set_window_long_ptr(hwnd: HWND, index: c_int, new_long: i32) -> i3
     }
 }
 
-pub unsafe fn get_wndproc(hwnd: HWND) -> WNDPROC {
-    // make the transmute cleaner
-    type WndProcfn = unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> isize;
-
-    let wndproc_i = match IsWindowUnicode(hwnd) {
-        0 => GetWindowLongPtrA(hwnd, GWLP_WNDPROC),
-        _ => GetWindowLongPtrW(hwnd, GWLP_WNDPROC),
-    };
-
-    if wndproc_i != 0 {
-        return Some(mem::transmute::<i32, WndProcfn>(wndproc_i));
-    } else {
-        return None;
-    }
-}
-
 pub unsafe fn get_window_long(hwnd: HWND, n_index: INT) -> LONG {
     return match IsWindowUnicode(hwnd) {
         0 => GetWindowLongA(hwnd, n_index),
