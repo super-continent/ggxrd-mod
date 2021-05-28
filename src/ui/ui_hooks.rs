@@ -129,7 +129,6 @@ pub unsafe fn init_ui() -> Result<(), Box<dyn Error>> {
     let mut im_ctx = imgui::Context::create();
     im_ctx.style_mut().use_dark_colors();
     im_ctx.fonts();
-    im_ctx.set_ini_filename(Some(std::path::PathBuf::from("imgui.ini")));
 
     debug!("Set up imgui context");
 
