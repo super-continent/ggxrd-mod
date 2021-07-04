@@ -256,7 +256,7 @@ unsafe extern "system" fn wnd_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let wndproc_addr = global::BASE_ADDRESS.load(Ordering::SeqCst) + crate::game::offset::FN_WNDPROC;
+    let wndproc_addr = crate::game::offset::FN_WNDPROC.address();
     let wndproc = make_fn!(wndproc_addr => unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT);
 
     if let Err(e) = imgui_win32_window_proc(hwnd, msg, wparam, lparam) {

@@ -32,8 +32,6 @@ lazy_static! {
 }
 
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
-    let base = global::BASE_ADDRESS.load(Ordering::SeqCst);
-
     // let game_loop_fn =
     //     make_fn!(base + offset::FN_LOOP_ROOT => unsafe extern "thiscall" fn (*mut u8));
 
@@ -47,7 +45,7 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     //     })?
     //     .enable()?;
 
-    let load_bbscript_fn = make_fn!(base + offset::FN_LOAD_BBSCRIPT => types::FnLoadBBScript);
+    let load_bbscript_fn = make_fn!(offset::FN_LOAD_BBSCRIPT.address() => types::FnLoadBBScript);
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?
