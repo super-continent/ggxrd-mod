@@ -45,7 +45,7 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     //     })?
     //     .enable()?;
 
-    let load_bbscript_fn = make_fn!(offset::FN_LOAD_BBSCRIPT.address() => types::FnLoadBBScript);
+    let load_bbscript_fn = make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => types::FnLoadBBScript);
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?

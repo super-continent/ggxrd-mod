@@ -22,37 +22,36 @@ lazy_static! {
 pub fn ui_loop(ui: Ui) -> Ui {
     let mut ui_state = GUI_STATE.lock();
 
-    if ui.is_key_pressed(VK_F1 as u32) {
+    if ui.is_key_index_pressed(VK_F1) {
         ui_state.display_ui = !ui_state.display_ui;
     }
 
     if ui_state.display_ui {
-        Window::new(im_str!("Rev2 Mod"))
+        Window::new("Rev2 Mod")
             .size([200., 400.], Condition::Once)
             .build(&ui, || {
-                TabBar::new(im_str!("BBScript Modding")).build(&ui, || {
-                    TabItem::new(im_str!("Mods")).build(&ui, || {
+                TabBar::new("BBScript Modding").build(&ui, || {
+                    TabItem::new("Mods").build(&ui, || {
                         let mut mods_on = global::MODS_ENABLED.load(Ordering::SeqCst);
 
-                        if ui.checkbox(im_str!("Script Mods Enabled"), &mut mods_on) {
+                        if ui.checkbox("Script Mods Enabled", &mut mods_on) {
                             debug!("Storing {} in global::MODS_ENABLED", mods_on);
                             global::MODS_ENABLED.store(mods_on, Ordering::SeqCst)
                         };
                     });
 
                     #[cfg(feature = "save-state")]
-                    TabItem::new(im_str!("Save States")).build(&ui, || {
-                        if ui.small_button(im_str!("Save")) {
+                    TabItem::new("Save States").build(&ui, || {
+                        if ui.small_button("Save") {
                             debug!("SaveState button clicked");
                         }
 
-                        if ui.small_button(im_str!("Load")) {
+                        if ui.small_button("Load") {
                             debug!("LoadState button clicked");
                         }
                     });
 
-                    TabItem::new(im_str!("Help"))
-                        .build(&ui, || ui.bullet_text(im_str!("F1: Show/Hide menu")));
+                    TabItem::new("Help").build(&ui, || ui.bullet_text("F1: Show/Hide menu"));
                 })
             });
     }

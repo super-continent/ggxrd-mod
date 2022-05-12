@@ -1,4 +1,4 @@
-#![feature(once_cell, abi_thiscall, const_fn_trait_bound)]
+#![feature(once_cell, abi_thiscall)]
 
 mod error;
 mod game;
@@ -8,11 +8,10 @@ mod ui;
 
 use std::ffi::{CString, OsString};
 use std::fs;
-use std::io::Write;
+
 use std::mem;
 use std::os::windows::ffi::OsStringExt;
-use std::path::Path;
-use std::ptr;
+
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::thread;
 
@@ -20,7 +19,7 @@ use std::thread;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-use config::ConfigError;
+
 use simplelog::*;
 use winapi::{
     ctypes::c_void,
@@ -67,25 +66,6 @@ unsafe fn initialize() {
         )
         .unwrap();
     }
-
-    let mut config = global::CONFIG.write();
-
-    config.set_default("script_mods", true);
-    config.set_default("ui_enabled", true);
-
-    if let Err(e) = config.merge(config::File::with_name(global::CONFIG_PATH)) {
-        warn!(
-            "{} could not be loaded: `{}`; continuing with config defaults...",
-            global::CONFIG_PATH,
-            e
-        );
-    }
-
-    debug!(
-        "Config state:\nscript_mods = {}\nui_enabled = {}",
-        config.get_bool("script_mods").unwrap_or(true),
-        config.get_bool("ui_enabled").unwrap_or(true)
-    );
 
     info!(
         "Mods folder created: {}",

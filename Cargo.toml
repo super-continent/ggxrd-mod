@@ -2,7 +2,7 @@
 name = "rev2-mod"
 version = "0.1.0"
 authors = [""]
-edition = "2018"
+edition = "2021"
 
 
 [lib]
@@ -19,11 +19,10 @@ save-state = []
 imgui-impl-win32-rs = { git = "https://github.com/super-continent/imgui-impl-win32-rs" }
 imgui-dx9-renderer = "0"
 winapi = { version = "0", features = ["minwindef", "consoleapi", "libloaderapi", "d3d9", "d3d9types", "ntdef"] }
-imgui = "0.6"
+imgui = "0.8"
 detour = { git = "https://github.com/darfink/detour-rs"}
 lazy_static = "1"
 parking_lot = "0"
 log = "0"
 simplelog = "0"
 thiserror = "1"
-config = "0"
