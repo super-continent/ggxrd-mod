@@ -1,25 +1,32 @@
 use super::gui;
 
-use crate::{error::ModError, make_fn};
-use crate::helpers::*;
 use crate::global;
+use crate::helpers::*;
+use crate::{error::ModError, make_fn};
 
-use std::{mem, sync::atomic::{AtomicUsize, Ordering}};
+use std::ffi::CString;
 use std::sync::Arc;
 use std::{error::Error, ptr};
+use std::{
+    mem,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use detour::static_detour;
 use imgui_dx9_renderer::Renderer;
 use imgui_impl_win32_rs::*;
 use parking_lot::Mutex;
+use winapi::um::winuser::LPMSG;
+use winapi::um::winuser::MSG;
 use winapi::{
     shared::{d3d9::*, d3d9types::*, minwindef::*, windef::HWND, winerror::FAILED},
     um::{
         errhandlingapi::GetLastError,
-        libloaderapi::GetModuleHandleW,
+        libloaderapi::{GetModuleHandleW, GetProcAddress},
         winuser::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, UnregisterClassW,
-            CS_HREDRAW, CS_VREDRAW, GWLP_WNDPROC, WNDCLASSEXW, WNDPROC, WS_EX_OVERLAPPEDWINDOW, GWL_WNDPROC
+            CS_HREDRAW, CS_VREDRAW, GWLP_WNDPROC, GWL_WNDPROC, WNDCLASSEXW, WNDPROC,
+            WS_EX_OVERLAPPEDWINDOW,
         },
     },
 };
@@ -32,6 +39,8 @@ lazy_static! {
 
 // Static Detour for EndScene and Reset
 static_detour! {
+    static PeekMessageWHook: unsafe extern "system" fn(LPMSG, HWND, u32, u32, u32) -> i32;
+    static SetWindowLongWHook: unsafe extern "system" fn(HWND, i32, i32) -> i32;
     static EndSceneHook: unsafe extern "system" fn(*mut IDirect3DDevice9) -> i32;
     static ResetHook: unsafe extern "system" fn(*mut IDirect3DDevice9, *mut D3DPRESENT_PARAMETERS) -> i32;
 }
@@ -49,7 +58,10 @@ unsafe fn get_d3d9_device_wndclass() -> Result<*mut IDirect3DDevice9, ModError> 
     if RegisterClassExW(&wndclass) == 0 {
         let err_code = GetLastError();
         UnregisterClassW(wndclass.lpszClassName, wndclass.hInstance);
-        return Err(ModError::GetDeviceFailed(format!("RegisterClassExW failed with error {:#08X}", err_code)));
+        return Err(ModError::GetDeviceFailed(format!(
+            "RegisterClassExW failed with error {:#08X}",
+            err_code
+        )));
     }
 
     let window = CreateWindowExW(
@@ -123,6 +135,20 @@ pub unsafe fn init_ui() -> Result<(), Box<dyn Error>> {
 
     debug!("Got device VTable");
 
+    debug!("Hooking PeekMessageW");
+
+    let user32_module = GetModuleHandleW(win32_wstring("User32.dll").as_ptr());
+    let name = CString::new("PeekMessageW").unwrap();
+
+    let peekmessagew_addr = GetProcAddress(user32_module, name.as_ptr());
+
+    let peekmessagew_addr =
+        make_fn!(peekmessagew_addr => unsafe extern "system" fn(LPMSG, HWND, u32, u32, u32) -> i32);
+
+    PeekMessageWHook
+        .initialize(peekmessagew_addr, peek_message_w_hook)?
+        .enable()?;
+
     let endscene = (*(*device).lpVtbl).EndScene;
     let reset = (*(*device).lpVtbl).Reset;
 
@@ -146,6 +172,28 @@ pub unsafe fn init_ui() -> Result<(), Box<dyn Error>> {
     ResetHook.initialize(reset, reset_hook)?.enable()?;
     EndSceneHook.initialize(endscene, endscene_hook)?.enable()?;
     Ok(())
+}
+
+fn peek_message_w_hook(
+    msg: LPMSG,
+    hwnd: HWND,
+    msg_filter_min: u32,
+    msg_filter_max: u32,
+    remove_msg: u32,
+) -> i32 {
+    unsafe {
+        let trampoline_ret =
+            PeekMessageWHook.call(msg, hwnd, msg_filter_min, msg_filter_max, remove_msg);
+
+        if trampoline_ret == 0 {
+            return FALSE;
+        }
+
+        if let Err(e) = handle_lpmsg_input(msg) {
+            error!("Error processing message: {}", e);
+        }
+    }
+    TRUE
 }
 
 fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
@@ -191,10 +239,10 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             state.window = Some(new_window);
 
             {
-                debug!("setting wndproc hook");
-                GAME_WINDOW_HWND.store(creation_params.hFocusWindow as usize, Ordering::SeqCst);
-                set_window_long_ptr(creation_params.hFocusWindow, GWLP_WNDPROC, wnd_proc as i32);
-                debug!("set wndproc hook");
+                // debug!("setting wndproc hook");
+                // GAME_WINDOW_HWND.store(creation_params.hFocusWindow as usize, Ordering::SeqCst);
+                // set_window_long_ptr(creation_params.hFocusWindow, GWLP_WNDPROC, wnd_proc as i32);
+                // debug!("set wndproc hook");
             }
         }
 
@@ -203,7 +251,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             if let Err(e) = wind.prepare_frame(&mut state.im_ctx) {
                 // Handles error of possibly setting wndproc for wrong window, should never happen.
                 error!("Error calling Win32Impl::prepare_frame: {}", e);
-                
+
                 drop(state.window.take());
                 return EndSceneHook.call(device);
             }
@@ -223,7 +271,9 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             error!("could not render draw data: {}", e);
         };
 
-        if get_window_long(GAME_WINDOW_HWND.load(Ordering::SeqCst) as HWND, GWL_WNDPROC) != wnd_proc as i32 {
+        if get_window_long(GAME_WINDOW_HWND.load(Ordering::SeqCst) as HWND, GWL_WNDPROC)
+            != wnd_proc as i32
+        {
             debug!("detected incorrect wndproc! resetting");
             drop(state.window.take())
         }
@@ -257,13 +307,24 @@ unsafe extern "system" fn wnd_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     let wndproc_addr = crate::game::offset::FN_WNDPROC.get_address();
-    let wndproc = make_fn!(wndproc_addr => unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT);
+    let wndproc =
+        make_fn!(wndproc_addr => unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT);
 
     if let Err(e) = imgui_win32_window_proc(hwnd, msg, wparam, lparam) {
         error!("Error calling imgui window proc: {}", e);
     };
 
     call_wndproc(Some(wndproc), hwnd, msg, wparam, lparam)
+}
+
+unsafe fn handle_lpmsg_input(msg: LPMSG) -> Result<(), Win32ImplError> {
+    let hwnd = (*msg).hwnd;
+    let msg_type = (*msg).message;
+    let wparam = (*msg).wParam;
+    let lparam = (*msg).lParam;
+
+    imgui_win32_window_proc(hwnd, msg_type, wparam, lparam)?;
+    Ok(())
 }
 
 struct ImState {
