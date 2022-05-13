@@ -17,7 +17,6 @@ use imgui_dx9_renderer::Renderer;
 use imgui_impl_win32_rs::*;
 use parking_lot::Mutex;
 use winapi::um::winuser::LPMSG;
-use winapi::um::winuser::MSG;
 use winapi::{
     shared::{d3d9::*, d3d9types::*, minwindef::*, windef::HWND, winerror::FAILED},
     um::{
@@ -25,7 +24,7 @@ use winapi::{
         libloaderapi::{GetModuleHandleW, GetProcAddress},
         winuser::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, UnregisterClassW,
-            CS_HREDRAW, CS_VREDRAW, GWLP_WNDPROC, GWL_WNDPROC, WNDCLASSEXW, WNDPROC,
+            CS_HREDRAW, CS_VREDRAW, GWL_WNDPROC, WNDCLASSEXW, WNDPROC,
             WS_EX_OVERLAPPEDWINDOW,
         },
     },

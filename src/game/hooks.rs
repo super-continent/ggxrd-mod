@@ -13,7 +13,7 @@ use parking_lot::Mutex;
 
 static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
-    //static GameLoopHook: unsafe extern "thiscall" fn (*mut u8);
+    static GameLoopHook: unsafe extern "thiscall" fn (*mut u8);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 
@@ -32,26 +32,48 @@ lazy_static! {
 }
 
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
-    // let game_loop_fn =
-    //     make_fn!(base + offset::FN_LOOP_ROOT => unsafe extern "thiscall" fn (*mut u8));
+    let game_loop_fn =
+        make_fn!(offset::FN_LOOP_ROOT.get_address() => unsafe extern "thiscall" fn (*mut u8));
 
+    //0x2ac58 tension pulse
     // debug!("game loop address: {:#X}", game_loop_fn as usize);
 
-    // GameLoopHook
-    //     .initialize(game_loop_fn, |x| {
-    //         trace!("game loop called!");
+    GameLoopHook
+        .initialize(game_loop_fn, |x| {
+            GameLoopHook.call(x);
 
-    //         GameLoopHook.call(x)
-    //     })?
-    //     .enable()?;
+            game_loop_hook(x);
+        })?
+        .enable()?;
 
-    let load_bbscript_fn = make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => types::FnLoadBBScript);
+    let load_bbscript_fn =
+        make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => types::FnLoadBBScript);
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?
         .enable()?;
 
     Ok(())
+}
+
+unsafe fn game_loop_hook(state_ptr: *mut u8) {
+    use crate::helpers::read_type;
+    const P1_OFFSET: isize = 0x3EF798;
+    const P2_OFFSET: isize = 0x41A460;
+
+    const TENSION_PULSE_OFFSET: isize = 0x2ac58;
+
+    let p1 = state_ptr.offset(P1_OFFSET);
+    let p2 = state_ptr.offset(P2_OFFSET);
+
+    global::TENSION_PULSE_P1.store(
+        read_type::<i32>(p1.offset(TENSION_PULSE_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::TENSION_PULSE_P2.store(
+        read_type::<i32>(p2.offset(TENSION_PULSE_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
 }
 
 // Hook for the fn that transfers script pointers.
@@ -62,9 +84,7 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
 
     debug!(
         "this: {:#X}, script_ptr: {:#X}, script_size: {:#X}",
-        this as usize,
-        script_ptr as usize,
-        script_size
+        this as usize, script_ptr as usize, script_size
     );
 
     unsafe {

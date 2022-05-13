@@ -20,6 +20,11 @@ macro_rules! make_fn {
     };
 }
 
+pub unsafe fn read_type<T: Sized>(ptr: *mut u8) -> T {
+    let ptr = ptr as *mut T;
+    ptr.read()
+}
+
 pub unsafe fn set_window_long_ptr(hwnd: HWND, index: c_int, new_long: i32) -> i32 {
     match IsWindowUnicode(hwnd) {
         0 => SetWindowLongPtrA(hwnd, index, new_long),
