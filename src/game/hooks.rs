@@ -1,4 +1,4 @@
-use super::{get_script_file, names, offset, types, ScriptFile, ScriptType};
+use super::{get_script_file, names, offset, internal, ScriptFile, ScriptType};
 use crate::{global, make_fn};
 
 use std::ffi::CStr;
@@ -40,14 +40,12 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
 
     GameLoopHook
         .initialize(game_loop_fn, |x| {
-            GameLoopHook.call(x);
-
             game_loop_hook(x);
         })?
         .enable()?;
 
     let load_bbscript_fn =
-        make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => types::FnLoadBBScript);
+        make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => internal::FnLoadBBScript);
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?
@@ -62,6 +60,13 @@ unsafe fn game_loop_hook(state_ptr: *mut u8) {
     const P2_OFFSET: isize = 0x41A460;
 
     const TENSION_PULSE_OFFSET: isize = 0x2ac58;
+
+    let config = global::CONFIG.lock();
+
+    debug!("{}", config.mods_enabled);
+
+    // Call the original game loop
+    GameLoopHook.call(state_ptr);
 
     let p1 = state_ptr.offset(P1_OFFSET);
     let p2 = state_ptr.offset(P2_OFFSET);

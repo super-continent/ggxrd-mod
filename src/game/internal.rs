@@ -1,3 +1,5 @@
+/// stuff that helps with access to the games internal state
+
 pub type FnLoadBBScript = unsafe extern "thiscall" fn(*mut u8, *mut u8, u32);
 
 pub struct Player {
@@ -7,9 +9,10 @@ pub struct Player {
     tension_pulse: u32,
 }
 
-pub struct GameState {
-    player_1: Player,
-    player_2: Player,
-}
+pub struct EnginePtr(*mut u8);
 
-unsafe impl Send for GameState {}
+impl EnginePtr {
+    fn new(ptr: *mut u8) -> Self {
+        Self(ptr)
+    }
+}

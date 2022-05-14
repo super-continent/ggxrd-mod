@@ -1,46 +1,58 @@
 use crate::global;
 
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use imgui::*;
-use parking_lot::Mutex;
+use std::sync::atomic::AtomicBool;
 use winapi::um::winuser::*;
 
-// i dont actually need a mutex here but its much easier for me than using thread_local!() stuff
-// if the mutex for some reason has a measurable performance impact (it shouldnt, i think anyway)
-// i might just deal with it and switch to TLS
 lazy_static! {
-    static ref GUI_STATE: Arc<Mutex<GuiState>> = Arc::new(Mutex::new(
-        GuiState {
-            // define defaults for UI here
-            display_ui: true,
-        }
-    ));
+    // this should work because we initialize the config
+    // before ever accessing DISPLAY_UI through the UI loop
+    static ref DISPLAY_UI: AtomicBool = AtomicBool::new(global::CONFIG.lock().display_ui_on_start);
+}
+
+fn save_config(config: global::ModConfig) {
+    std::fs::File::create(global::CONFIG_PATH)
+        .and_then(|mut f| {
+            use std::io::Write;
+            let string_config = toml::to_string_pretty(&config).unwrap();
+            f.write_all(string_config.as_bytes())
+        })
+        .unwrap_or_else(|e| error!("writing config: {}", e));
 }
 
 pub fn ui_loop(ui: Ui) -> Ui {
-    let mut ui_state = GUI_STATE.lock();
+    let display_ui = DISPLAY_UI.load(Ordering::SeqCst);
+    let mut config = global::CONFIG.lock();
 
     if ui.is_key_index_pressed(VK_F1) {
-        ui_state.display_ui = !ui_state.display_ui;
+        DISPLAY_UI.store(!display_ui, Ordering::SeqCst);
     }
 
-    if !ui_state.display_ui {
+    if !display_ui {
         return ui;
     }
 
     Window::new("Rev2 Mod")
-        .size([200., 400.], Condition::Once)
+        .size([200., 400.], Condition::FirstUseEver)
         .build(&ui, || {
-            TabBar::new("BBScript Modding").build(&ui, || {
-                TabItem::new("Mods").build(&ui, || {
-                    let mut mods_on = global::MODS_ENABLED.load(Ordering::SeqCst);
+            TabBar::new("Mods and Config").build(&ui, || {
+                TabItem::new("Config").build(&ui, || {
+                    let mut mods_on = config.mods_enabled;
+                    let mut startup_ui = config.display_ui_on_start;
 
-                    if ui.checkbox("Script Mods Enabled", &mut mods_on) {
-                        debug!("Storing {} in global::MODS_ENABLED", mods_on);
-                        global::MODS_ENABLED.store(mods_on, Ordering::SeqCst)
+                    if ui.checkbox("Script mods enabled", &mut mods_on) {
+                        config.mods_enabled = mods_on
                     };
+                    
+                    if ui.checkbox("Display UI on startup", &mut startup_ui) {
+                        config.display_ui_on_start = startup_ui
+                    };
+
+                    if ui.button("Save Config") {
+                        save_config(config.clone())
+                    }
                 });
 
                 #[cfg(feature = "save-state")]
@@ -64,14 +76,15 @@ pub fn ui_loop(ui: Ui) -> Ui {
             const MIN_TENSION_PULSE: f32 = -25000.0;
             const MAX_TENSION_PULSE: f32 = 25000.0;
 
-            
             let p1_pulse = global::TENSION_PULSE_P1.load(Ordering::SeqCst);
             let p2_pulse = global::TENSION_PULSE_P2.load(Ordering::SeqCst);
-            
+
             ui.text("P1 Tension Pulse");
-            ProgressBar::new((p1_pulse as f32 + MAX_TENSION_PULSE) / (MAX_TENSION_PULSE + -(MIN_TENSION_PULSE)))
-                .overlay_text(format!("{}/25000", p1_pulse))
-                .build(&ui);
+            ProgressBar::new(
+                (p1_pulse as f32 + MAX_TENSION_PULSE) / (MAX_TENSION_PULSE + -(MIN_TENSION_PULSE)),
+            )
+            .overlay_text(format!("{}/25000", p1_pulse))
+            .build(&ui);
 
             ui.text("P2 Tension Pulse");
             ProgressBar::new((p2_pulse as f32 + MAX_TENSION_PULSE) / (MAX_TENSION_PULSE * 2.0))
@@ -80,8 +93,3 @@ pub fn ui_loop(ui: Ui) -> Ui {
         });
     ui
 }
-
-struct GuiState {
-    pub display_ui: bool,
-}
-unsafe impl Send for GuiState {}

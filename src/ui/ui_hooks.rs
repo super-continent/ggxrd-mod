@@ -153,7 +153,6 @@ pub unsafe fn init_ui() -> Result<(), Box<dyn Error>> {
 
     let mut im_ctx = imgui::Context::create();
     im_ctx.style_mut().use_dark_colors();
-    im_ctx.fonts();
 
     debug!("Set up imgui context");
 
@@ -270,12 +269,12 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             error!("could not render draw data: {}", e);
         };
 
-        if get_window_long(GAME_WINDOW_HWND.load(Ordering::SeqCst) as HWND, GWL_WNDPROC)
-            != wnd_proc as i32
-        {
-            debug!("detected incorrect wndproc! resetting");
-            drop(state.window.take())
-        }
+        // if get_window_long(GAME_WINDOW_HWND.load(Ordering::SeqCst) as HWND, GWL_WNDPROC)
+        //     != wnd_proc as i32
+        // {
+        //     debug!("detected incorrect wndproc! resetting");
+        //     drop(state.window.take())
+        // }
 
         EndSceneHook.call(device)
     }

@@ -23,6 +23,8 @@ imgui = "0.8"
 detour = { git = "https://github.com/darfink/detour-rs"}
 lazy_static = "1"
 parking_lot = "0"
-log = "0"
+log = { version = "0", features = ["serde"] }
 simplelog = "0"
 thiserror = "1"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"

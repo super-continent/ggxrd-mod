@@ -1,6 +1,6 @@
 pub mod hooks;
 pub mod offset;
-pub mod types;
+pub mod internal;
 
 use std::io::prelude::*;
 use std::{fs::File, path::PathBuf};

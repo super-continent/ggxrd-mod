@@ -7,11 +7,13 @@ mod helpers;
 mod ui;
 
 use std::ffi::{CString, OsString};
-use std::fs;
+use std::fs::{self, File};
 
+use std::io::{Read, Write};
 use std::mem;
 use std::os::windows::ffi::OsStringExt;
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::thread;
 
@@ -32,8 +34,6 @@ use winapi::{
     um::{unknwnbase::LPUNKNOWN, winnt::DLL_PROCESS_ATTACH},
 };
 
-const LOG_LEVEL: LevelFilter = LevelFilter::Debug;
-
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c_void) -> BOOL {
@@ -52,20 +52,49 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
 }
 
 unsafe fn initialize() {
-    info!("Initializing!");
+    let config_path = PathBuf::from(global::CONFIG_PATH);
 
-    if let Ok(logfile) = std::fs::File::create("rev2mod.log") {
-        WriteLogger::init(LOG_LEVEL, Config::default(), logfile).unwrap();
+    if !config_path.is_file() {
+        let default_config = global::ModConfig::default();
+        let default_config_str = toml::to_string_pretty(&default_config).unwrap();
+
+        match File::create(config_path) {
+            Ok(mut f) => f.write_all(default_config_str.as_bytes()).unwrap(),
+            Err(e) => error!("{}", e),
+        };
+    } else {
+        match File::open(config_path) {
+            Ok(mut f) => {
+                let mut config = String::new();
+                f.read_to_string(&mut config).unwrap();
+
+                let new_config = toml::from_str::<global::ModConfig>(&config)
+                    .unwrap_or(global::ModConfig::default());
+
+                let mut config_lock = global::CONFIG.lock();
+                *config_lock = new_config;
+            }
+            Err(e) => error!("{}", e),
+        };
+    }
+
+    let log_level = global::CONFIG.lock().log_level;
+    if let Ok(logfile) = File::create("rev2mod.log") {
+        WriteLogger::init(log_level, Config::default(), logfile).unwrap();
     } else {
         AllocConsole();
         TermLogger::init(
-            LOG_LEVEL,
+            log_level,
             Config::default(),
             TerminalMode::Stdout,
             ColorChoice::Auto,
         )
         .unwrap();
     }
+
+    info!("Successfully created logging and config setup");
+
+    info!("Initializing");
 
     info!(
         "Mods folder created: {}",
