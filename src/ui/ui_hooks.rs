@@ -1,16 +1,12 @@
 use super::gui;
 
-use crate::global;
 use crate::helpers::*;
 use crate::{error::ModError, make_fn};
 
 use std::ffi::CString;
 use std::sync::Arc;
 use std::{error::Error, ptr};
-use std::{
-    mem,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::{mem, sync::atomic::AtomicUsize};
 
 use detour::static_detour;
 use imgui_dx9_renderer::Renderer;
@@ -24,8 +20,7 @@ use winapi::{
         libloaderapi::{GetModuleHandleW, GetProcAddress},
         winuser::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, UnregisterClassW,
-            CS_HREDRAW, CS_VREDRAW, GWL_WNDPROC, WNDCLASSEXW, WNDPROC,
-            WS_EX_OVERLAPPEDWINDOW,
+            CS_HREDRAW, CS_VREDRAW, WNDCLASSEXW, WNDPROC, WS_EX_OVERLAPPEDWINDOW,
         },
     },
 };
@@ -296,23 +291,6 @@ fn reset_hook(device: *mut IDirect3DDevice9, present_params: *mut D3DPRESENT_PAR
 
         ResetHook.call(device, present_params)
     }
-}
-
-unsafe extern "system" fn wnd_proc(
-    hwnd: HWND,
-    msg: UINT,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    let wndproc_addr = crate::game::offset::FN_WNDPROC.get_address();
-    let wndproc =
-        make_fn!(wndproc_addr => unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT);
-
-    if let Err(e) = imgui_win32_window_proc(hwnd, msg, wparam, lparam) {
-        error!("Error calling imgui window proc: {}", e);
-    };
-
-    call_wndproc(Some(wndproc), hwnd, msg, wparam, lparam)
 }
 
 unsafe fn handle_lpmsg_input(msg: LPMSG) -> Result<(), Win32ImplError> {
