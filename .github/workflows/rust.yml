@@ -21,7 +21,7 @@ jobs:
     - name: Build
       run: cargo +nightly-i686-pc-windows-msvc build --release --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo +nightly-i686-pc-windows-msvc test --verbose
     - name: Archive build artifacts
       uses: actions/upload-artifact@v2
       with:
