@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,10 +16,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install Toolchain
+      run: rustup install nightly-i686-pc-windows-msvc
     - name: Build
-      run: cargo +nightly build --release --verbose
+      run: cargo +nightly-i686-pc-windows-msvc build --release --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo +nightly-i686-pc-windows-msvc test --verbose
     - name: Archive build artifacts
       uses: actions/upload-artifact@v2
       with:

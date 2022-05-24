@@ -1,4 +1,6 @@
 use crate::global;
+use  crate::game::hooks::save_state;
+use  crate::game::hooks::load_state;
 
 use std::sync::atomic::Ordering;
 
@@ -55,14 +57,20 @@ pub fn ui_loop(ui: Ui) -> Ui {
                     }
                 });
 
-                #[cfg(feature = "save-state")]
+                //#[cfg(feature = "save-state")]
                 TabItem::new("Save States").build(&ui, || {
                     if ui.small_button("Save") {
                         debug!("SaveState button clicked");
+                        unsafe {
+                            save_state();
+                        }
                     }
 
                     if ui.small_button("Load") {
                         debug!("LoadState button clicked");
+                        unsafe {
+                            load_state();
+                        }
                     }
                 });
 
@@ -71,13 +79,41 @@ pub fn ui_loop(ui: Ui) -> Ui {
         });
 
     Window::new("Game State Info")
-        .size([200., 200.], Condition::Once)
+        .size([200., 400.], Condition::Once)
         .build(&ui, || {
             const MIN_TENSION_PULSE: f32 = -25000.0;
             const MAX_TENSION_PULSE: f32 = 25000.0;
 
+            let p1_health = global::HEALTH_P1.load(Ordering::SeqCst);
+            let p2_health = global::HEALTH_P2.load(Ordering::SeqCst);
+
             let p1_pulse = global::TENSION_PULSE_P1.load(Ordering::SeqCst);
             let p2_pulse = global::TENSION_PULSE_P2.load(Ordering::SeqCst);
+
+            ui.text(format!("P1 Direction: {}", global::DIRECTION_P1.load(Ordering::SeqCst)));
+            ui.text(format!("P2 Direction: {}", global::DIRECTION_P2.load(Ordering::SeqCst)));
+
+            ui.text(format!("P1 X Position: {}", global::X_POSITION_P1.load(Ordering::SeqCst)));
+            ui.text(format!("P2 X Position: {}", global::X_POSITION_P2.load(Ordering::SeqCst)));
+
+            ui.text(format!("P1 Y Position: {}", global::Y_POSITION_P1.load(Ordering::SeqCst)));
+            ui.text(format!("P2 Y Position: {}", global::Y_POSITION_P2.load(Ordering::SeqCst)));
+
+            ui.text(format!("P1 X Velocity: {}", global::X_VELOCITY_P1.load(Ordering::SeqCst)));
+            ui.text(format!("P2 X Velocity: {}", global::X_VELOCITY_P2.load(Ordering::SeqCst)));
+
+            ui.text(format!("P1 Y Velocity: {}", global::Y_VELOCITY_P1.load(Ordering::SeqCst)));
+            ui.text(format!("P2 Y Velocity: {}", global::Y_VELOCITY_P2.load(Ordering::SeqCst)));
+
+            ui.text("P1 Health");
+            ProgressBar::new(p1_health as f32 / 420.0)
+            .overlay_text(format!("{}/420", p1_health))
+            .build(&ui);
+
+            ui.text("P2 Health");
+            ProgressBar::new(p1_health as f32 / 420.0)
+            .overlay_text(format!("{}/420", p2_health))
+            .build(&ui);
 
             ui.text("P1 Tension Pulse");
             ProgressBar::new(
