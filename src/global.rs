@@ -10,6 +10,36 @@ lazy_static! {
 }
 
 lazy_static! {
+    pub static ref DIRECTION_P1: AtomicIsize = AtomicIsize::new(0);
+    pub static ref DIRECTION_P2: AtomicIsize = AtomicIsize::new(0);
+}
+
+lazy_static! {
+    pub static ref X_POSITION_P1: AtomicIsize = AtomicIsize::new(0);
+    pub static ref X_POSITION_P2: AtomicIsize = AtomicIsize::new(0);
+}
+
+lazy_static! {
+    pub static ref Y_POSITION_P1: AtomicIsize = AtomicIsize::new(0);
+    pub static ref Y_POSITION_P2: AtomicIsize = AtomicIsize::new(0);
+}
+
+lazy_static! {
+    pub static ref X_VELOCITY_P1: AtomicIsize = AtomicIsize::new(0);
+    pub static ref X_VELOCITY_P2: AtomicIsize = AtomicIsize::new(0);
+}
+
+lazy_static! {
+    pub static ref Y_VELOCITY_P1: AtomicIsize = AtomicIsize::new(0);
+    pub static ref Y_VELOCITY_P2: AtomicIsize = AtomicIsize::new(0);
+}
+
+lazy_static! {
+    pub static ref HEALTH_P1: AtomicIsize = AtomicIsize::new(0);
+    pub static ref HEALTH_P2: AtomicIsize = AtomicIsize::new(0);
+}
+
+lazy_static! {
     pub static ref TENSION_PULSE_P1: AtomicIsize = AtomicIsize::new(0);
     pub static ref TENSION_PULSE_P2: AtomicIsize = AtomicIsize::new(0);
 }
