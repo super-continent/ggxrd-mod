@@ -1,5 +1,7 @@
 use super::{get_script_file, names, offset, internal, ScriptFile, ScriptType};
 use crate::{global, make_fn};
+use std::fs::File;
+use std::io::prelude::*;
 
 use std::ffi::CStr;
 use std::ptr;
@@ -8,12 +10,40 @@ use std::sync::{
     Arc,
 };
 
+static mut ENGINE_PTR: *mut u8 = ptr::null_mut();
+static mut STATE_PTR: *mut u8 = ptr::null_mut();
+static mut RNG_PTR: *mut u8 = ptr::null_mut();
+static mut CAMERA_PTR: *mut u8 = ptr::null_mut();
+
 use detour::static_detour;
 use parking_lot::Mutex;
+#[derive(Clone)]
+pub struct XrdState {
+    ENGINE_1: Vec<u8>,
+    ENGINE_2: Vec<u8>,
+    OBJ_ARRAY: Vec<Vec<u8>>,
+    CHARA_ARRAY: Vec<Vec<u8>>,
+    SCREEN_MANAGER: Vec<u8>,
+    BATTLE_STATE: Vec<u8>,
+    RNG_SEED: Vec<u8>,
+    CAMERA: Vec<u8>,
+}
+
+static mut GAME_STATE: XrdState = XrdState{
+    ENGINE_1: Vec::new(),
+    ENGINE_2: Vec::new(),
+    OBJ_ARRAY: Vec::new(),
+    CHARA_ARRAY: Vec::new(),
+    SCREEN_MANAGER: Vec::new(),
+    BATTLE_STATE: Vec::new(),
+    RNG_SEED: Vec::new(),
+    CAMERA: Vec::new(),
+};
 
 static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
-    static GameLoopHook: unsafe extern "thiscall" fn (*mut u8);
+    static GameLoopHook: unsafe extern "thiscall" fn (*mut u8, bool);
+    static SetupHook: unsafe extern "thiscall" fn (*mut u8);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 
@@ -31,16 +61,89 @@ lazy_static! {
         Arc::new(Mutex::new(ScriptFile::Sol));
 }
 
+pub unsafe fn load_state() {
+    if !ENGINE_PTR.is_null() {
+        //std::ptr::copy_nonoverlapping(GAME_STATE.ENGINE_1.as_mut_ptr(), ENGINE_PTR, 0x1398);
+        std::ptr::copy_nonoverlapping(GAME_STATE.ENGINE_2.as_mut_ptr(), ENGINE_PTR.offset(0x445128), 0x8BED4);
+        load_obj();
+        load_chara();
+        std::ptr::copy_nonoverlapping(GAME_STATE.SCREEN_MANAGER.as_mut_ptr(), STATE_PTR.offset(4622944), 0x188);
+        std::ptr::copy_nonoverlapping(GAME_STATE.BATTLE_STATE.as_mut_ptr(), STATE_PTR.offset(4623564), 0x14C);
+        std::ptr::copy_nonoverlapping(GAME_STATE.RNG_SEED.as_mut_ptr(), RNG_PTR, 0x1398);
+        std::ptr::copy_nonoverlapping(GAME_STATE.CAMERA.as_mut_ptr(), CAMERA_PTR, 0x200);
+    }
+}
+
+pub unsafe fn load_obj() {
+    let mut index = 0;
+    let mut p_m_ActiveState: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
+    for mut obj in &GAME_STATE.OBJ_ARRAY {
+        let m_ActiveState: u8 = obj[0xC];
+        if m_ActiveState > 0 {
+            std::ptr::copy_nonoverlapping(obj.as_ptr(), ENGINE_PTR.offset(0x1398 + (index * 0x2840)), 0x2840);
+        }
+        else {
+            *p_m_ActiveState = 0;
+        }
+        index += 1;
+        p_m_ActiveState = p_m_ActiveState.offset(0x2840);
+    }
+}
+
+pub unsafe fn load_chara() {
+    std::ptr::copy_nonoverlapping(GAME_STATE.CHARA_ARRAY[0].as_ptr(), ENGINE_PTR.offset(0x3EF798), 0x2ACC8);
+    std::ptr::copy_nonoverlapping(GAME_STATE.CHARA_ARRAY[1].as_ptr(), ENGINE_PTR.offset(0x41A460), 0x2ACC8);
+}
+
+pub unsafe fn save_state() {
+    if !ENGINE_PTR.is_null() {
+        //GAME_STATE.ENGINE_1 = std::slice::from_raw_parts_mut(ENGINE_PTR, 0x1398).to_vec();
+        GAME_STATE.ENGINE_2 = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x445128), 0x8BED4).to_vec();
+        save_obj();
+        save_chara();
+        GAME_STATE.SCREEN_MANAGER = std::slice::from_raw_parts_mut(STATE_PTR.offset(4622944), 0x188).to_vec();
+        GAME_STATE.BATTLE_STATE = std::slice::from_raw_parts_mut(STATE_PTR.offset(4623564), 0x14C).to_vec();
+        GAME_STATE.RNG_SEED = std::slice::from_raw_parts_mut(RNG_PTR, 0x1398).to_vec();
+        GAME_STATE.CAMERA = std::slice::from_raw_parts_mut(CAMERA_PTR, 0x200).to_vec();
+    }
+}
+
+pub unsafe fn save_obj() {
+    let mut index = 0;
+    let mut p_m_ActiveState: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
+    for mut obj in &mut GAME_STATE.OBJ_ARRAY {
+        if *p_m_ActiveState > 0 {
+            obj = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x1398 + (index * 0x2840)), 0x2840).to_vec().as_mut();
+        }
+        index += 1;
+        p_m_ActiveState = p_m_ActiveState.offset(0x2840);
+    }
+}
+
+pub unsafe fn save_chara() {
+    GAME_STATE.CHARA_ARRAY[0] = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798), 0x2ACC8).to_vec();
+    GAME_STATE.CHARA_ARRAY[1] = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798 + 0x2ACC8), 0x2ACC8).to_vec();
+}
+
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     let game_loop_fn =
-        make_fn!(offset::FN_LOOP_ROOT.get_address() => unsafe extern "thiscall" fn (*mut u8));
+        make_fn!(offset::FN_LOOP_ROOT.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
     //0x2ac58 tension pulse
     // debug!("game loop address: {:#X}", game_loop_fn as usize);
 
     GameLoopHook
-        .initialize(game_loop_fn, |x| {
-            game_loop_hook(x);
+        .initialize(game_loop_fn, |x, b| {
+            game_loop_hook(x, b);
+        })?
+        .enable()?;
+
+    let setup_fn =
+        make_fn!(offset::FN_SETUP.get_address() => unsafe extern "thiscall" fn (*mut u8));
+    
+    SetupHook
+        .initialize(setup_fn, |x| {
+            setup_hook(x);
         })?
         .enable()?;
 
@@ -54,23 +157,91 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     Ok(())
 }
 
-unsafe fn game_loop_hook(state_ptr: *mut u8) {
+unsafe fn setup_hook(state_ptr: *mut u8) {
+    SetupHook.call(state_ptr);
+    ENGINE_PTR = state_ptr;
+    let rng: *mut *mut u8 = offset::RNG.get_address() as *mut *mut u8;
+    RNG_PTR = *rng as *mut u8;
+    let camera: *mut *mut u8 = offset::CAMERA.get_address() as *mut *mut u8;
+    CAMERA_PTR = *camera as *mut u8;
+    GAME_STATE.OBJ_ARRAY = vec!(vec!(0; 0x2840); 400);
+    GAME_STATE.CHARA_ARRAY = vec!(vec!(0; 0x2ACC8); 2);
+}
+
+unsafe fn game_loop_hook(game_state: *mut u8, update_draw: bool) {
+    let state: *mut *mut u8 = offset::GAME_STATE.get_address() as *mut *mut u8;
+    let state_ptr: *mut u8 = (*state as *mut u8).offset(4);
+    STATE_PTR = *state;
+
+    GameLoopHook.call(game_state, update_draw);
+    
     use crate::helpers::read_type;
     const P1_OFFSET: isize = 0x3EF798;
     const P2_OFFSET: isize = 0x41A460;
 
+    const DIRECTION_OFFSET: isize = 0x248;
+    const X_POSITION_OFFSET: isize = 0x24C;
+    const Y_POSITION_OFFSET: isize = 0x250;
+    const X_VELOCITY_OFFSET: isize = 0x2FC;
+    const Y_VELOCITY_OFFSET: isize = 0x300;
+    const HEALTH_OFFSET: isize = 0x9CC;
     const TENSION_PULSE_OFFSET: isize = 0x2ac58;
 
     let config = global::CONFIG.lock();
 
     debug!("{}", config.mods_enabled);
 
-    // Call the original game loop
-    GameLoopHook.call(state_ptr);
-
     let p1 = state_ptr.offset(P1_OFFSET);
     let p2 = state_ptr.offset(P2_OFFSET);
 
+    global::DIRECTION_P1.store(
+        read_type::<i32>(p1.offset(DIRECTION_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::DIRECTION_P2.store(
+        read_type::<i32>(p2.offset(DIRECTION_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::X_POSITION_P1.store(
+        read_type::<i32>(p1.offset(X_POSITION_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::X_POSITION_P2.store(
+        read_type::<i32>(p2.offset(X_POSITION_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::Y_POSITION_P1.store(
+        read_type::<i32>(p1.offset(Y_POSITION_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::Y_POSITION_P2.store(
+        read_type::<i32>(p2.offset(Y_POSITION_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::X_VELOCITY_P1.store(
+        read_type::<i32>(p1.offset(X_VELOCITY_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::X_VELOCITY_P2.store(
+        read_type::<i32>(p2.offset(X_VELOCITY_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::Y_VELOCITY_P1.store(
+        read_type::<i32>(p1.offset(Y_VELOCITY_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::Y_VELOCITY_P2.store(
+        read_type::<i32>(p2.offset(Y_VELOCITY_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::HEALTH_P1.store(
+        read_type::<i32>(p1.offset(HEALTH_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
+    global::HEALTH_P2.store(
+        read_type::<i32>(p2.offset(HEALTH_OFFSET)) as isize,
+        Ordering::SeqCst,
+    );
     global::TENSION_PULSE_P1.store(
         read_type::<i32>(p1.offset(TENSION_PULSE_OFFSET)) as isize,
         Ordering::SeqCst,

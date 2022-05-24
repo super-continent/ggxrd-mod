@@ -1,8 +1,12 @@
 #![allow(dead_code)]
 
 pub const FN_LOAD_BBSCRIPT: Address = Address::offset(0xBBF000);
-pub const FN_LOOP_ROOT: Address = Address::offset(0x9CDF30); // Maybe the game loops outermost layer, runs once per frame
+pub const FN_LOOP_ROOT: Address = Address::offset(0xA56EF0);
 pub const FN_WNDPROC: Address = Address::offset(0x94AF60);
+pub const FN_SETUP: Address = Address::offset(0xA48660);
+pub const GAME_STATE: Address = Address::offset(0x1987724);
+pub const RNG: Address = Address::offset(0x1767154);
+pub const CAMERA: Address = Address::offset(0x17679A0);
 
 pub enum Address<'a> {
     Offset(u32),
