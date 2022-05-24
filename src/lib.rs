@@ -79,6 +79,7 @@ unsafe fn initialize() {
     }
 
     let log_level = global::CONFIG.lock().log_level;
+    // let log_level = LevelFilter::Trace;
     if let Ok(logfile) = File::create("rev2mod.log") {
         WriteLogger::init(log_level, Config::default(), logfile).unwrap();
     } else {
@@ -111,11 +112,13 @@ unsafe fn initialize() {
     }
     info!("UI hook success!");
 
-    debug!("Waiting 5 seconds before initializing game hooks...");
-    thread::sleep(std::time::Duration::from_secs(5));
+    debug!("Waiting for Endscene call to hook game");
+    while !global::GAME_UNPACKED.load(Ordering::SeqCst) {
+        thread::sleep(std::time::Duration::from_millis(10));
+    }
 
+    info!("Initializing game hooks...");
     let game_result = game::hooks::init_game_hooks();
-
     info!("Game hooks ok?: {}", game_result.is_ok());
 }
 

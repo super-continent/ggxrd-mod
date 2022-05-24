@@ -191,7 +191,9 @@ fn peek_message_w_hook(
 
 fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
     unsafe {
-        trace!("endscene called");
+        crate::global::GAME_UNPACKED.store(true, std::sync::atomic::Ordering::SeqCst);
+
+        // trace!("endscene called");
         let mut state_lock = IMHOOK_STATE.lock();
         //trace!("acquired state lock");
         let state: &mut ImState = match *state_lock {

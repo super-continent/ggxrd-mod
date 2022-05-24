@@ -1,4 +1,4 @@
-use super::{get_script_file, names, offset, internal, ScriptFile, ScriptType};
+use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::{global, make_fn};
 
 use std::ffi::CStr;
@@ -32,17 +32,21 @@ lazy_static! {
 }
 
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
-    let game_loop_fn =
-        make_fn!(offset::FN_LOOP_ROOT.get_address() => unsafe extern "thiscall" fn (*mut u8));
+    // let loop_root = offset::FN_LOOP_ROOT.find_in_base_module();
 
-    //0x2ac58 tension pulse
-    // debug!("game loop address: {:#X}", game_loop_fn as usize);
+    // if loop_root.is_none() {
+    //     info!("Could not locate game loop root!");
+    //     panic!("TODO: add graceful shutdown")
+    // }
 
-    GameLoopHook
-        .initialize(game_loop_fn, |x| {
-            game_loop_hook(x);
-        })?
-        .enable()?;
+    // debug!("loop root offset: {:X?}", loop_root);
+    // let game_loop_fn = make_fn!(loop_root.unwrap() => unsafe extern "thiscall" fn (*mut u8));
+
+    let game_loop_fn = make_fn!(offset::FN_CONTROL_BATTLE_OBJECT.get_address() => unsafe extern "thiscall" fn (*mut u8));
+
+    GameLoopHook.initialize(game_loop_fn, |x| {
+        control_battle_object_hook(x);
+    })?.enable()?;
 
     let load_bbscript_fn =
         make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => internal::FnLoadBBScript);
@@ -54,7 +58,7 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     Ok(())
 }
 
-unsafe fn game_loop_hook(state_ptr: *mut u8) {
+unsafe fn control_battle_object_hook(state_ptr: *mut u8) {
     use crate::helpers::read_type;
     const P1_OFFSET: isize = 0x3EF798;
     const P2_OFFSET: isize = 0x41A460;
@@ -62,8 +66,6 @@ unsafe fn game_loop_hook(state_ptr: *mut u8) {
     const TENSION_PULSE_OFFSET: isize = 0x2ac58;
 
     let config = global::CONFIG.lock();
-
-    debug!("{}", config.mods_enabled);
 
     // Call the original game loop
     GameLoopHook.call(state_ptr);
