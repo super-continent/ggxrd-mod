@@ -54,22 +54,29 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
 unsafe fn initialize() {
     let config_path = PathBuf::from(global::CONFIG_PATH);
 
-    if !config_path.is_file() {
-        let default_config = global::ModConfig::default();
-        let default_config_str = toml::to_string_pretty(&default_config).unwrap();
+    let default_config = global::ModConfig::default();
+    let default_config_str = toml::to_string_pretty(&default_config).unwrap();
 
+    if !config_path.is_file() {
         match File::create(config_path) {
             Ok(mut f) => f.write_all(default_config_str.as_bytes()).unwrap(),
             Err(e) => error!("{}", e),
         };
     } else {
-        match File::open(config_path) {
+        match File::open(&config_path) {
             Ok(mut f) => {
                 let mut config = String::new();
                 f.read_to_string(&mut config).unwrap();
 
                 let new_config = toml::from_str::<global::ModConfig>(&config)
-                    .unwrap_or(global::ModConfig::default());
+                    .unwrap_or_else(|e| {
+                        error!("error loading config: {}, writing default...", e);
+                        match File::create(&config_path) {
+                            Ok(mut f) => f.write_all(default_config_str.as_bytes()).unwrap(),
+                            Err(e) => error!("{}", e),
+                        };
+                        default_config
+                    });
 
                 let mut config_lock = global::CONFIG.lock();
                 *config_lock = new_config;

@@ -84,7 +84,7 @@ macro_rules! pattern {
 pub struct Offset(u32);
 
 impl Offset {
-    /// Create an [`Address`] that calculates the offset of a programs base address
+    /// Create an [`Offset`] that calculates the offset of a programs base address
     pub const fn new(offset: u32) -> Self {
         Self(offset)
     }

@@ -1,8 +1,7 @@
 use parking_lot::Mutex;
 use serde::{Serialize, Deserialize};
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, AtomicIsize};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicIsize};
 
 lazy_static! {
     pub static ref MODS_ENABLED: AtomicBool = AtomicBool::new(true);

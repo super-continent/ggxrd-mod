@@ -57,7 +57,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
                     }
                 });
 
-                //#[cfg(feature = "save-state")]
+                #[cfg(feature = "save-state")]
                 TabItem::new("Save States").build(&ui, || {
                     if ui.small_button("Save") {
                         debug!("SaveState button clicked");
@@ -111,7 +111,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
             .build(&ui);
 
             ui.text("P2 Health");
-            ProgressBar::new(p1_health as f32 / 420.0)
+            ProgressBar::new(p2_health as f32 / 420.0)
             .overlay_text(format!("{}/420", p2_health))
             .build(&ui);
 

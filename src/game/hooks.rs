@@ -1,7 +1,5 @@
 use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::{global, make_fn};
-use std::fs::File;
-use std::io::prelude::*;
 
 use std::ffi::CStr;
 use std::ptr;
@@ -19,25 +17,23 @@ use detour::static_detour;
 use parking_lot::Mutex;
 #[derive(Clone)]
 pub struct XrdState {
-    ENGINE_1: Vec<u8>,
-    ENGINE_2: Vec<u8>,
-    OBJ_ARRAY: Vec<Vec<u8>>,
-    CHARA_ARRAY: Vec<Vec<u8>>,
-    SCREEN_MANAGER: Vec<u8>,
-    BATTLE_STATE: Vec<u8>,
-    RNG_SEED: Vec<u8>,
-    CAMERA: Vec<u8>,
+    engine: Vec<u8>,
+    obj_array: Vec<Vec<u8>>,
+    chara_array: Vec<Vec<u8>>,
+    screen_manager: Vec<u8>,
+    battle_state: Vec<u8>,
+    rng_seed: Vec<u8>,
+    camera: Vec<u8>,
 }
 
-static mut GAME_STATE: XrdState = XrdState{
-    ENGINE_1: Vec::new(),
-    ENGINE_2: Vec::new(),
-    OBJ_ARRAY: Vec::new(),
-    CHARA_ARRAY: Vec::new(),
-    SCREEN_MANAGER: Vec::new(),
-    BATTLE_STATE: Vec::new(),
-    RNG_SEED: Vec::new(),
-    CAMERA: Vec::new(),
+static mut GAME_STATE: XrdState = XrdState {
+    engine: Vec::new(),
+    obj_array: Vec::new(),
+    chara_array: Vec::new(),
+    screen_manager: Vec::new(),
+    battle_state: Vec::new(),
+    rng_seed: Vec::new(),
+    camera: Vec::new(),
 };
 
 static_detour! {
@@ -64,70 +60,102 @@ lazy_static! {
 pub unsafe fn load_state() {
     if !ENGINE_PTR.is_null() {
         //std::ptr::copy_nonoverlapping(GAME_STATE.ENGINE_1.as_mut_ptr(), ENGINE_PTR, 0x1398);
-        std::ptr::copy_nonoverlapping(GAME_STATE.ENGINE_2.as_mut_ptr(), ENGINE_PTR.offset(0x445128), 0x8BED4);
+        std::ptr::copy_nonoverlapping(
+            GAME_STATE.engine.as_mut_ptr(),
+            ENGINE_PTR.offset(0x445128),
+            0x8BED4,
+        );
         load_obj();
         load_chara();
-        std::ptr::copy_nonoverlapping(GAME_STATE.SCREEN_MANAGER.as_mut_ptr(), STATE_PTR.offset(4622944), 0x188);
-        std::ptr::copy_nonoverlapping(GAME_STATE.BATTLE_STATE.as_mut_ptr(), STATE_PTR.offset(4623564), 0x14C);
-        std::ptr::copy_nonoverlapping(GAME_STATE.RNG_SEED.as_mut_ptr(), RNG_PTR, 0x1398);
-        std::ptr::copy_nonoverlapping(GAME_STATE.CAMERA.as_mut_ptr(), CAMERA_PTR, 0x200);
+        std::ptr::copy_nonoverlapping(
+            GAME_STATE.screen_manager.as_mut_ptr(),
+            STATE_PTR.offset(4622944),
+            0x188,
+        );
+        std::ptr::copy_nonoverlapping(
+            GAME_STATE.battle_state.as_mut_ptr(),
+            STATE_PTR.offset(4623564),
+            0x14C,
+        );
+        std::ptr::copy_nonoverlapping(GAME_STATE.rng_seed.as_mut_ptr(), RNG_PTR, 0x1398);
+        std::ptr::copy_nonoverlapping(GAME_STATE.camera.as_mut_ptr(), CAMERA_PTR, 0x200);
     }
 }
 
 pub unsafe fn load_obj() {
     let mut index = 0;
-    let mut p_m_ActiveState: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
-    for mut obj in &GAME_STATE.OBJ_ARRAY {
-        let m_ActiveState: u8 = obj[0xC];
-        if m_ActiveState > 0 {
-            std::ptr::copy_nonoverlapping(obj.as_ptr(), ENGINE_PTR.offset(0x1398 + (index * 0x2840)), 0x2840);
-        }
-        else {
-            *p_m_ActiveState = 0;
+    let mut active_state_ptr: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
+    for obj in &GAME_STATE.obj_array {
+        let active_state: u8 = obj[0xC];
+        if active_state > 0 {
+            std::ptr::copy_nonoverlapping(
+                obj.as_ptr(),
+                ENGINE_PTR.offset(0x1398 + (index * 0x2840)),
+                0x2840,
+            );
+        } else {
+            *active_state_ptr = 0;
         }
         index += 1;
-        p_m_ActiveState = p_m_ActiveState.offset(0x2840);
+        active_state_ptr = active_state_ptr.offset(0x2840);
     }
 }
 
 pub unsafe fn load_chara() {
-    std::ptr::copy_nonoverlapping(GAME_STATE.CHARA_ARRAY[0].as_ptr(), ENGINE_PTR.offset(0x3EF798), 0x2ACC8);
-    std::ptr::copy_nonoverlapping(GAME_STATE.CHARA_ARRAY[1].as_ptr(), ENGINE_PTR.offset(0x41A460), 0x2ACC8);
+    std::ptr::copy_nonoverlapping(
+        GAME_STATE.chara_array[0].as_ptr(),
+        ENGINE_PTR.offset(0x3EF798),
+        0x2ACC8,
+    );
+    std::ptr::copy_nonoverlapping(
+        GAME_STATE.chara_array[1].as_ptr(),
+        ENGINE_PTR.offset(0x41A460),
+        0x2ACC8,
+    );
 }
 
 pub unsafe fn save_state() {
     if !ENGINE_PTR.is_null() {
         //GAME_STATE.ENGINE_1 = std::slice::from_raw_parts_mut(ENGINE_PTR, 0x1398).to_vec();
-        GAME_STATE.ENGINE_2 = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x445128), 0x8BED4).to_vec();
+        GAME_STATE.engine =
+            std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x445128), 0x8BED4).to_vec();
         save_obj();
         save_chara();
-        GAME_STATE.SCREEN_MANAGER = std::slice::from_raw_parts_mut(STATE_PTR.offset(4622944), 0x188).to_vec();
-        GAME_STATE.BATTLE_STATE = std::slice::from_raw_parts_mut(STATE_PTR.offset(4623564), 0x14C).to_vec();
-        GAME_STATE.RNG_SEED = std::slice::from_raw_parts_mut(RNG_PTR, 0x1398).to_vec();
-        GAME_STATE.CAMERA = std::slice::from_raw_parts_mut(CAMERA_PTR, 0x200).to_vec();
+        GAME_STATE.screen_manager =
+            std::slice::from_raw_parts_mut(STATE_PTR.offset(4622944), 0x188).to_vec();
+        GAME_STATE.battle_state =
+            std::slice::from_raw_parts_mut(STATE_PTR.offset(4623564), 0x14C).to_vec();
+        GAME_STATE.rng_seed = std::slice::from_raw_parts_mut(RNG_PTR, 0x1398).to_vec();
+        GAME_STATE.camera = std::slice::from_raw_parts_mut(CAMERA_PTR, 0x200).to_vec();
     }
 }
 
 pub unsafe fn save_obj() {
     let mut index = 0;
-    let mut p_m_ActiveState: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
-    for mut obj in &mut GAME_STATE.OBJ_ARRAY {
-        if *p_m_ActiveState > 0 {
-            obj = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x1398 + (index * 0x2840)), 0x2840).to_vec().as_mut();
+    let mut active_state: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
+    for mut _obj in &mut GAME_STATE.obj_array {
+        if *active_state > 0 {
+            _obj = std::slice::from_raw_parts_mut(
+                ENGINE_PTR.offset(0x1398 + (index * 0x2840)),
+                0x2840,
+            )
+            .to_vec()
+            .as_mut();
         }
         index += 1;
-        p_m_ActiveState = p_m_ActiveState.offset(0x2840);
+        active_state = active_state.offset(0x2840);
     }
 }
 
 pub unsafe fn save_chara() {
-    GAME_STATE.CHARA_ARRAY[0] = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798), 0x2ACC8).to_vec();
-    GAME_STATE.CHARA_ARRAY[1] = std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798 + 0x2ACC8), 0x2ACC8).to_vec();
+    GAME_STATE.chara_array[0] =
+        std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798), 0x2ACC8).to_vec();
+    GAME_STATE.chara_array[1] =
+        std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798 + 0x2ACC8), 0x2ACC8).to_vec();
 }
 
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
-    let game_loop_fn =
-        make_fn!(offset::FN_LOOP_ROOT.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
+    let game_loop_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
     // if loop_root.is_none() {
     //     info!("Could not locate game loop root!");
@@ -142,7 +170,7 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
 
     let setup_fn =
         make_fn!(offset::FN_SETUP.get_address() => unsafe extern "thiscall" fn (*mut u8));
-    
+
     SetupHook
         .initialize(setup_fn, |x| {
             setup_hook(x);
@@ -166,8 +194,8 @@ unsafe fn setup_hook(state_ptr: *mut u8) {
     RNG_PTR = *rng as *mut u8;
     let camera: *mut *mut u8 = offset::CAMERA.get_address() as *mut *mut u8;
     CAMERA_PTR = *camera as *mut u8;
-    GAME_STATE.OBJ_ARRAY = vec!(vec!(0; 0x2840); 400);
-    GAME_STATE.CHARA_ARRAY = vec!(vec!(0; 0x2ACC8); 2);
+    GAME_STATE.obj_array = vec![vec!(0; 0x2840); 400];
+    GAME_STATE.chara_array = vec![vec!(0; 0x2ACC8); 2];
 }
 
 unsafe fn game_loop_hook(game_state: *mut u8, update_draw: bool) {
@@ -176,7 +204,7 @@ unsafe fn game_loop_hook(game_state: *mut u8, update_draw: bool) {
     STATE_PTR = *state;
 
     GameLoopHook.call(game_state, update_draw);
-    
+
     use crate::helpers::read_type;
     const P1_OFFSET: isize = 0x3EF798;
     const P2_OFFSET: isize = 0x41A460;
@@ -190,8 +218,6 @@ unsafe fn game_loop_hook(game_state: *mut u8, update_draw: bool) {
     const TENSION_PULSE_OFFSET: isize = 0x2ac58;
 
     let config = global::CONFIG.lock();
-
-    debug!("{}", config.mods_enabled);
 
     let p1 = state_ptr.offset(P1_OFFSET);
     let p2 = state_ptr.offset(P2_OFFSET);
