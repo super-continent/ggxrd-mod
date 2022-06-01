@@ -7,7 +7,7 @@ edition = "2021"
 
 [lib]
 name = "rev2hook"
-path = "src/lib.rs" 
+path = "src/lib.rs"
 crate_type = ["cdylib"]
 
 [features]
@@ -18,9 +18,17 @@ save-state = []
 [dependencies]
 imgui-impl-win32-rs = { git = "https://github.com/super-continent/imgui-impl-win32-rs" }
 imgui-dx9-renderer = "0"
-winapi = { version = "0", features = ["minwindef", "consoleapi", "libloaderapi", "d3d9", "d3d9types", "ntdef", "psapi"] }
+winapi = { version = "0", features = [
+    "minwindef",
+    "consoleapi",
+    "libloaderapi",
+    "d3d9",
+    "d3d9types",
+    "ntdef",
+    "psapi",
+] }
 imgui = "0.8"
-detour = { git = "https://github.com/darfink/detour-rs"}
+detour = { git = "https://github.com/darfink/detour-rs" }
 lazy_static = "1"
 parking_lot = "0"
 log = { version = "0", features = ["serde"] }
@@ -29,3 +37,5 @@ thiserror = "1"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 dashmap = "5.3"
+puffin-imgui = "0.16"
+puffin = "0.13"
