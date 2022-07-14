@@ -29,7 +29,6 @@ winapi = { version = "0", features = [
 ] }
 imgui = "0.8"
 detour = { git = "https://github.com/darfink/detour-rs" }
-lazy_static = "1"
 parking_lot = "0"
 log = { version = "0", features = ["serde"] }
 simplelog = "0"
@@ -39,3 +38,4 @@ toml = "0.5"
 dashmap = "5.3"
 puffin-imgui = "0.16"
 puffin = "0.13"
+once_cell = { version = "1.13", features = ["parking_lot"] }

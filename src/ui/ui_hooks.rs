@@ -1,5 +1,6 @@
 use super::gui;
 
+use crate::global::GlobalMut;
 use crate::helpers::*;
 use crate::{error::ModError, make_fn};
 
@@ -11,6 +12,7 @@ use std::{mem, sync::atomic::AtomicUsize};
 use detour::static_detour;
 use imgui_dx9_renderer::Renderer;
 use imgui_impl_win32_rs::*;
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use winapi::um::winuser::LPMSG;
 use winapi::{
@@ -25,11 +27,10 @@ use winapi::{
     },
 };
 
-lazy_static! {
-    static ref IMHOOK_STATE: Arc<Mutex<Option<ImState>>> = Arc::new(Mutex::new(None));
-    static ref ORIG_WNDPROC: Arc<Mutex<WNDPROC>> = Arc::new(Mutex::new(None));
-    static ref GAME_WINDOW_HWND: AtomicUsize = AtomicUsize::new(0);
-}
+static IMHOOK_STATE: GlobalMut<Option<ImState>> = Lazy::new(|| Mutex::new(None));
+static ORIG_WNDPROC: GlobalMut<WNDPROC> = Lazy::new(|| Mutex::new(None));
+static GAME_WINDOW_HWND: AtomicUsize = AtomicUsize::new(0);
+
 
 // Static Detour for EndScene and Reset
 static_detour! {
@@ -190,8 +191,18 @@ fn peek_message_w_hook(
 }
 
 fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
+    puffin::profile_function!();
     unsafe {
         crate::global::GAME_UNPACKED.store(true, std::sync::atomic::Ordering::SeqCst);
+
+        let profiled_endscene = |device| {
+            puffin::profile_scope!("EndScene");
+            let return_value = EndSceneHook.call(device);
+            
+            puffin::GlobalProfiler::lock().new_frame();
+
+            return return_value
+        };
 
         // trace!("endscene called");
         let mut state_lock = IMHOOK_STATE.lock();
@@ -199,7 +210,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
         let state: &mut ImState = match *state_lock {
             Some(ref mut s) => s,
             None => {
-                return EndSceneHook.call(device);
+                return profiled_endscene(device)
             }
         };
 
@@ -208,7 +219,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     error!("Error creating new renderer: {:#X}", e);
-                    return EndSceneHook.call(device);
+                    return profiled_endscene(device)
                 }
             };
 
@@ -219,7 +230,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             let mut creation_params: D3DDEVICE_CREATION_PARAMETERS = mem::zeroed();
 
             if (*device).GetCreationParameters(&mut creation_params) != 0 {
-                return EndSceneHook.call(device);
+                return profiled_endscene(device)
             };
 
             let new_window = match Win32Impl::init(&mut state.im_ctx, creation_params.hFocusWindow)
@@ -227,7 +238,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     error!("Error creating new Win32Impl: {}", e);
-                    return EndSceneHook.call(device);
+                    return profiled_endscene(device)
                 }
             };
 
@@ -248,7 +259,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 error!("Error calling Win32Impl::prepare_frame: {}", e);
 
                 drop(state.window.take());
-                return EndSceneHook.call(device);
+                return profiled_endscene(device)
             }
         }
 
@@ -259,7 +270,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             Some(r) => r,
             None => {
                 error!("no renderer in state");
-                return EndSceneHook.call(device);
+                return profiled_endscene(device);
             }
         };
         if let Err(e) = renderer.render(draw_data) {
@@ -272,8 +283,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
         //     debug!("detected incorrect wndproc! resetting");
         //     drop(state.window.take())
         // }
-
-        EndSceneHook.call(device)
+        profiled_endscene(device)
     }
 }
 

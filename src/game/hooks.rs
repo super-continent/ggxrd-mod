@@ -1,4 +1,5 @@
 use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
+use crate::global::GlobalMut;
 use crate::{global, make_fn};
 
 use std::ffi::CStr;
@@ -14,6 +15,7 @@ static mut RNG_PTR: *mut u8 = ptr::null_mut();
 static mut CAMERA_PTR: *mut u8 = ptr::null_mut();
 
 use detour::static_detour;
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 #[derive(Clone)]
 pub struct XrdState {
@@ -38,24 +40,17 @@ static mut GAME_STATE: XrdState = XrdState {
 
 static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
-    static GameLoopHook: unsafe extern "thiscall" fn (*mut u8, bool);
+    static ControlBattleObjectHook: unsafe extern "thiscall" fn (*mut u8);
+    static UpdateBattleHook: unsafe extern "thiscall" fn (*mut u8, bool);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 
-lazy_static! {
-    static ref MATCH_SCRIPTS: Arc<Mutex<BBScriptStorage>> = Arc::new(Mutex::new(BBScriptStorage {
-        common: None,
-        common_ef: None,
-        player_1: None,
-        player_2: None,
-        player_1_ef: None,
-        player_2_ef: None
-    }));
-    static ref SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
-    static ref SCRIPT_LAST_CHARACTER: Arc<Mutex<ScriptFile>> =
-        Arc::new(Mutex::new(ScriptFile::Sol));
-}
+static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> = Lazy::new(|| {
+    Mutex::new(BBScriptStorage::default())
+});
+static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
+static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
 
 pub unsafe fn load_state() {
     if !ENGINE_PTR.is_null() {
@@ -155,16 +150,20 @@ pub unsafe fn save_chara() {
 }
 
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
-    let game_loop_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
+    let update_battle_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-    // if loop_root.is_none() {
-    //     info!("Could not locate game loop root!");
-    //     panic!("TODO: add graceful shutdown")
-    // }
+    UpdateBattleHook
+        .initialize(update_battle_fn, |x, b| {
+            update_battle_hook(x, b);
+        })?
+        .enable()?;
 
-    GameLoopHook
-        .initialize(game_loop_fn, |x, b| {
-            game_loop_hook(x, b);
+    let control_battle_object_fn = make_fn!(offset::FN_CONTROL_BATTLE_OBJECT.get_address() => unsafe extern "thiscall" fn (*mut u8));
+
+    ControlBattleObjectHook
+        .initialize(control_battle_object_fn, |x| {
+            puffin::profile_scope!("CObjectManager::ControlBattleObject");
+            ControlBattleObjectHook.call(x)
         })?
         .enable()?;
 
@@ -198,12 +197,16 @@ unsafe fn setup_hook(state_ptr: *mut u8) {
     GAME_STATE.chara_array = vec![vec!(0; 0x2ACC8); 2];
 }
 
-unsafe fn game_loop_hook(game_state: *mut u8, update_draw: bool) {
+unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
+    puffin::profile_function!();
+
     let state: *mut *mut u8 = offset::GAME_STATE.get_address() as *mut *mut u8;
     let state_ptr: *mut u8 = (*state as *mut u8).offset(4);
     STATE_PTR = *state;
-
-    GameLoopHook.call(game_state, update_draw);
+    {
+        puffin::profile_scope!("AREDGameInfo_Battle::UpdateBattle");
+        UpdateBattleHook.call(game_state, update_draw);
+    }
 
     use crate::helpers::read_type;
     const P1_OFFSET: isize = 0x3EF798;
@@ -285,6 +288,7 @@ unsafe fn game_loop_hook(game_state: *mut u8, update_draw: bool) {
 fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
     // TODO: figure out how to detect which character and script
     // is being loaded in a non-hacky way, should be a UE3 script function
+    puffin::profile_function!();
 
     debug!(
         "this: {:#X}, script_ptr: {:#X}, script_size: {:#X}",
@@ -358,6 +362,12 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
             _ => {}
         }
 
+        let mut pawns = global::SCRIPT_PAWN_ADDR.lock();
+        match count {
+            5.. => {}
+            c => pawns[c] = this as u32,
+        }
+
         let mods_enabled = global::MODS_ENABLED.load(Ordering::SeqCst);
         debug!("Mods enabled: {}", mods_enabled);
         if mods_enabled {
@@ -366,10 +376,14 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
             }
         }
 
-        LoadBBScriptHook.call(this, script_ptr, script_size)
+        {
+            puffin::profile_scope!("BBSAnalyzeExe");
+            LoadBBScriptHook.call(this, script_ptr, script_size)
+        }
     }
 }
 
+#[derive(Default)]
 struct BBScriptStorage {
     pub common: Option<Vec<u8>>,
     pub common_ef: Option<Vec<u8>>,
