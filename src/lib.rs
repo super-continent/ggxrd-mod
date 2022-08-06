@@ -14,7 +14,7 @@ use std::mem;
 use std::os::windows::ffi::OsStringExt;
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::Ordering;
 use std::thread;
 
 #[macro_use]

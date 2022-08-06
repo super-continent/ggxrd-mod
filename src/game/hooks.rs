@@ -1,13 +1,11 @@
 use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
+use crate::game::get_script_filename;
 use crate::global::GlobalMut;
 use crate::{global, make_fn};
 
 use std::ffi::CStr;
 use std::ptr;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 static mut ENGINE_PTR: *mut u8 = ptr::null_mut();
 static mut STATE_PTR: *mut u8 = ptr::null_mut();
@@ -46,9 +44,8 @@ static_detour! {
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 
-static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> = Lazy::new(|| {
-    Mutex::new(BBScriptStorage::default())
-});
+static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
+    Lazy::new(|| Mutex::new(BBScriptStorage::default()));
 static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
 
@@ -220,7 +217,7 @@ unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
     const HEALTH_OFFSET: isize = 0x9CC;
     const TENSION_PULSE_OFFSET: isize = 0x2ac58;
 
-    let config = global::CONFIG.lock();
+    // let config = global::CONFIG.lock();
 
     let p1 = state_ptr.offset(P1_OFFSET);
     let p2 = state_ptr.offset(P2_OFFSET);
@@ -296,10 +293,16 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
     );
 
     unsafe {
-        let mut last_script = SCRIPT_LAST_CHARACTER.lock();
+        let mut last_character = SCRIPT_LAST_CHARACTER.lock();
         let count = SCRIPT_LOAD_CALL_COUNTER.fetch_add(1, Ordering::SeqCst) % 6;
 
-        let script = if count == 0 || count == 2 {
+        let script_type = if (count % 2) == 0 {
+            ScriptType::Main
+        } else {
+            ScriptType::Effect
+        };
+
+        if count == 0 || count == 2 {
             // player 1/2 main file, we find the char names here
             let state_count = ptr::read_unaligned::<u32>(script_ptr as *const _);
             // calculate offset to a specific bbscript function that seems to always contains the characters name
@@ -309,7 +312,7 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
 
             debug!("character_shortname: {:?}", character_shortname);
 
-            *last_script = match character_shortname.to_bytes() {
+            *last_character = match character_shortname.to_bytes() {
                 names::ANSWER => ScriptFile::Answer,
                 names::AXL => ScriptFile::Axl,
                 names::BAIKEN => ScriptFile::Baiken,
@@ -337,17 +340,42 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
                 names::ZATO => ScriptFile::Zato,
                 _ => ScriptFile::Sol,
             };
+        }
 
-            get_script_file(*last_script, ScriptType::Main)
-        } else if count == 1 || count == 3 {
-            // player 1/2 effect file
-            get_script_file(*last_script, ScriptType::Effect)
-        } else if count == 4 {
-            // cmn
-            get_script_file(ScriptFile::Common, ScriptType::Main)
+        {
+            use std::path::PathBuf;
+
+            let config = global::CONFIG.lock();
+            if config.dump_scripts {
+                let dump_folder = PathBuf::from(global::DUMPED_SCRIPTS_FOLDER);
+
+                if !dump_folder.is_dir() {
+                    if let Err(e) = std::fs::create_dir(&dump_folder) {
+                        debug!("error creating dumped scripts folder: {}", e);
+                    }
+                }
+
+                let script_slice = std::slice::from_raw_parts(script_ptr, script_size as usize);
+
+                let result = if count < 4 {
+                    let path = dump_folder.join(get_script_filename(*last_character, script_type));
+                    std::fs::write(path, script_slice)
+                } else {
+                    let path =
+                        dump_folder.join(get_script_filename(ScriptFile::Common, script_type));
+                    std::fs::write(path, script_slice)
+                };
+
+                if let Err(e) = result {
+                    debug!("error dumping script file: {}", e);
+                }
+            }
+        }
+
+        let script = if count < 4 {
+            get_script_file(*last_character, script_type)
         } else {
-            // cmn effect
-            get_script_file(ScriptFile::Common, ScriptType::Effect)
+            get_script_file(ScriptFile::Common, script_type)
         };
 
         let mut script_storage = MATCH_SCRIPTS.lock();
@@ -363,10 +391,8 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
         }
 
         let mut pawns = global::SCRIPT_PAWN_ADDR.lock();
-        match count {
-            5.. => {}
-            c => pawns[c] = this as u32,
-        }
+        
+        pawns[count] = this as u32;
 
         let mods_enabled = global::MODS_ENABLED.load(Ordering::SeqCst);
         debug!("Mods enabled: {}", mods_enabled);

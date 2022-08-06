@@ -97,10 +97,17 @@ impl ScriptFile {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum ScriptType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScriptType {
     Main,
     Effect,
+}
+
+pub fn get_script_filename(script_file: ScriptFile, script_type: ScriptType) -> String {
+    match script_type {
+        ScriptType::Main => format!("{}.bbscript", script_file.short_name()),
+        ScriptType::Effect => format!("{}_ef.bbscript", script_file.short_name()),
+    }
 }
 
 fn get_script_file(script_file: ScriptFile, file_type: ScriptType) -> Option<Vec<u8>> {
@@ -108,10 +115,7 @@ fn get_script_file(script_file: ScriptFile, file_type: ScriptType) -> Option<Vec
 
     let mut script = Vec::new();
 
-    let file_name = match file_type {
-        ScriptType::Main => format!("{}.bbscript", script_file.short_name()),
-        ScriptType::Effect => format!("{}_ef.bbscript", script_file.short_name()),
-    };
+    let file_name = get_script_filename(script_file, file_type);
 
     mods_path.push(file_name);
 

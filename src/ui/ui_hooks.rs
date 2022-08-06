@@ -5,9 +5,8 @@ use crate::helpers::*;
 use crate::{error::ModError, make_fn};
 
 use std::ffi::CString;
-use std::sync::Arc;
+use std::mem;
 use std::{error::Error, ptr};
-use std::{mem, sync::atomic::AtomicUsize};
 
 use detour::static_detour;
 use imgui_dx9_renderer::Renderer;
@@ -22,15 +21,14 @@ use winapi::{
         libloaderapi::{GetModuleHandleW, GetProcAddress},
         winuser::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, UnregisterClassW,
-            CS_HREDRAW, CS_VREDRAW, WNDCLASSEXW, WNDPROC, WS_EX_OVERLAPPEDWINDOW,
+            CS_HREDRAW, CS_VREDRAW, WNDCLASSEXW, WS_EX_OVERLAPPEDWINDOW,
         },
     },
 };
 
 static IMHOOK_STATE: GlobalMut<Option<ImState>> = Lazy::new(|| Mutex::new(None));
-static ORIG_WNDPROC: GlobalMut<WNDPROC> = Lazy::new(|| Mutex::new(None));
-static GAME_WINDOW_HWND: AtomicUsize = AtomicUsize::new(0);
-
+// static ORIG_WNDPROC: GlobalMut<WNDPROC> = Lazy::new(|| Mutex::new(None));
+// static GAME_WINDOW_HWND: AtomicUsize = AtomicUsize::new(0);
 
 // Static Detour for EndScene and Reset
 static_detour! {
@@ -198,10 +196,10 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
         let profiled_endscene = |device| {
             puffin::profile_scope!("EndScene");
             let return_value = EndSceneHook.call(device);
-            
+
             puffin::GlobalProfiler::lock().new_frame();
 
-            return return_value
+            return return_value;
         };
 
         // trace!("endscene called");
@@ -209,9 +207,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
         //trace!("acquired state lock");
         let state: &mut ImState = match *state_lock {
             Some(ref mut s) => s,
-            None => {
-                return profiled_endscene(device)
-            }
+            None => return profiled_endscene(device),
         };
 
         if state.renderer.is_none() {
@@ -219,7 +215,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     error!("Error creating new renderer: {:#X}", e);
-                    return profiled_endscene(device)
+                    return profiled_endscene(device);
                 }
             };
 
@@ -230,7 +226,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             let mut creation_params: D3DDEVICE_CREATION_PARAMETERS = mem::zeroed();
 
             if (*device).GetCreationParameters(&mut creation_params) != 0 {
-                return profiled_endscene(device)
+                return profiled_endscene(device);
             };
 
             let new_window = match Win32Impl::init(&mut state.im_ctx, creation_params.hFocusWindow)
@@ -238,7 +234,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     error!("Error creating new Win32Impl: {}", e);
-                    return profiled_endscene(device)
+                    return profiled_endscene(device);
                 }
             };
 
@@ -259,7 +255,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 error!("Error calling Win32Impl::prepare_frame: {}", e);
 
                 drop(state.window.take());
-                return profiled_endscene(device)
+                return profiled_endscene(device);
             }
         }
 

@@ -46,6 +46,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
                 TabItem::new("Config").build(&ui, || {
                     let mut mods_on = config.mods_enabled;
                     let mut startup_ui = config.display_ui_on_start;
+                    let mut dump_scripts = config.dump_scripts;
 
                     if ui.checkbox("Script mods enabled", &mut mods_on) {
                         config.mods_enabled = mods_on
@@ -53,6 +54,10 @@ pub fn ui_loop(ui: Ui) -> Ui {
 
                     if ui.checkbox("Display UI on startup", &mut startup_ui) {
                         config.display_ui_on_start = startup_ui
+                    };
+
+                    if ui.checkbox("Dump game scripts", &mut dump_scripts) {
+                        config.dump_scripts = dump_scripts
                     };
 
                     if ui.button("Save Config") {

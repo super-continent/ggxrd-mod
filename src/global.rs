@@ -3,7 +3,6 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use std::sync::atomic::{AtomicBool, AtomicIsize};
-use std::sync::Arc;
 
 pub type GlobalMut<T> = Lazy<Mutex<T>>;
 
@@ -36,7 +35,8 @@ pub static TENSION_PULSE_P2: AtomicIsize = AtomicIsize::new(0);
 pub static SCRIPT_PAWN_ADDR: GlobalMut<[u32; 7]> = Lazy::new(|| Mutex::new([0; 7]));
 
 /// The folder where all .bbscript files are held
-pub const MODS_FOLDER: &str = r"..\..\Mods";
+pub const MODS_FOLDER: &str = r"..\..\Mods\";
+pub const DUMPED_SCRIPTS_FOLDER: &str = r"..\..\Dumped Scripts\";
 pub const CONFIG_PATH: &str = r".\rev2mod_config.toml";
 
 #[derive(PartialEq, Eq, Hash)]
@@ -45,8 +45,8 @@ pub enum StateValue {}
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ModConfig {
     pub mods_enabled: bool,
-    pub hot_reloading: bool,
     pub display_ui_on_start: bool,
+    pub dump_scripts: bool,
     pub log_level: log::LevelFilter,
 }
 
@@ -54,8 +54,8 @@ impl Default for ModConfig {
     fn default() -> Self {
         Self {
             mods_enabled: true,
-            hot_reloading: true,
             display_ui_on_start: true,
+            dump_scripts: false,
             log_level: log::LevelFilter::Info,
         }
     }
