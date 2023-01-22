@@ -79,8 +79,7 @@ macro_rules! pattern {
     (@ONE_ELEMENT _) => { None };
 }
 
-/// Type for storing offsets and AOB scans
-/// for finding the offset of something within a running program
+/// Type for storing offsets to memory
 pub struct Offset(u32);
 
 impl Offset {

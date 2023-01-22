@@ -28,7 +28,7 @@ winapi = { version = "0", features = [
     "psapi",
 ] }
 imgui = "0.8"
-detour = { git = "https://github.com/darfink/detour-rs" }
+detour = { git = "https://github.com/Jakobzs/detour-rs", package = "detour3" }
 parking_lot = "0"
 log = { version = "0", features = ["serde"] }
 simplelog = "0"

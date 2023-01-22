@@ -149,11 +149,11 @@ pub unsafe fn save_chara() {
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     let update_battle_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-    UpdateBattleHook
-        .initialize(update_battle_fn, |x, b| {
-            update_battle_hook(x, b);
-        })?
-        .enable()?;
+    // UpdateBattleHook
+    //     .initialize(update_battle_fn, |x, b| {
+    //         update_battle_hook(x, b);
+    //     })?
+    //     .enable()?;
 
     let control_battle_object_fn = make_fn!(offset::FN_CONTROL_BATTLE_OBJECT.get_address() => unsafe extern "thiscall" fn (*mut u8));
 
@@ -167,11 +167,11 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     let setup_fn =
         make_fn!(offset::FN_SETUP.get_address() => unsafe extern "thiscall" fn (*mut u8));
 
-    SetupHook
-        .initialize(setup_fn, |x| {
-            setup_hook(x);
-        })?
-        .enable()?;
+    // SetupHook
+    //     .initialize(setup_fn, |x| {
+    //         setup_hook(x);
+    //     })?
+    //     .enable()?;
 
     let load_bbscript_fn =
         make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => internal::FnLoadBBScript);
@@ -283,6 +283,8 @@ unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
 // Hook for the fn that transfers script pointers.
 // This implementation currently will break any modes that load in more than 6 scripts (e.g. MOM mode)
 fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
+    use std::path::PathBuf;
+
     // TODO: figure out how to detect which character and script
     // is being loaded in a non-hacky way, should be a UE3 script function
     puffin::profile_function!();
@@ -342,33 +344,28 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
             };
         }
 
-        {
-            use std::path::PathBuf;
+        let config = global::CONFIG.lock();
+        if config.dump_scripts {
+            let dump_folder = PathBuf::from(global::DUMPED_SCRIPTS_FOLDER);
 
-            let config = global::CONFIG.lock();
-            if config.dump_scripts {
-                let dump_folder = PathBuf::from(global::DUMPED_SCRIPTS_FOLDER);
-
-                if !dump_folder.is_dir() {
-                    if let Err(e) = std::fs::create_dir(&dump_folder) {
-                        debug!("error creating dumped scripts folder: {}", e);
-                    }
+            if !dump_folder.is_dir() {
+                if let Err(e) = std::fs::create_dir(&dump_folder) {
+                    debug!("error creating dumped scripts folder: {}", e);
                 }
+            }
 
-                let script_slice = std::slice::from_raw_parts(script_ptr, script_size as usize);
+            let script_slice = std::slice::from_raw_parts(script_ptr, script_size as usize);
 
-                let result = if count < 4 {
-                    let path = dump_folder.join(get_script_filename(*last_character, script_type));
-                    std::fs::write(path, script_slice)
-                } else {
-                    let path =
-                        dump_folder.join(get_script_filename(ScriptFile::Common, script_type));
-                    std::fs::write(path, script_slice)
-                };
+            let result = if count < 4 {
+                let path = dump_folder.join(get_script_filename(*last_character, script_type));
+                std::fs::write(path, script_slice)
+            } else {
+                let path = dump_folder.join(get_script_filename(ScriptFile::Common, script_type));
+                std::fs::write(path, script_slice)
+            };
 
-                if let Err(e) = result {
-                    debug!("error dumping script file: {}", e);
-                }
+            if let Err(e) = result {
+                debug!("error dumping script file: {}", e);
             }
         }
 
@@ -391,10 +388,10 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
         }
 
         let mut pawns = global::SCRIPT_PAWN_ADDR.lock();
-        
+
         pawns[count] = this as u32;
 
-        let mods_enabled = global::MODS_ENABLED.load(Ordering::SeqCst);
+        let mods_enabled = config.mods_enabled;
         debug!("Mods enabled: {}", mods_enabled);
         if mods_enabled {
             if let Some((mod_pointer, mod_size)) = script_storage.get_script_ptr(count) {
