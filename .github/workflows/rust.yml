@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, rollback-update ]
   pull_request:
     branches: [ main ]
 
