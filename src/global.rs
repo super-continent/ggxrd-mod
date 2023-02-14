@@ -2,40 +2,30 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use std::sync::atomic::{AtomicBool, AtomicIsize};
+use std::path::PathBuf;
+
+use crate::helpers;
 
 pub type GlobalMut<T> = Lazy<Mutex<T>>;
 
-pub static GAME_UNPACKED: AtomicBool = AtomicBool::new(false);
-
-pub static MODS_ENABLED: AtomicBool = AtomicBool::new(true);
 pub static CONFIG: GlobalMut<ModConfig> = Lazy::new(|| Mutex::new(ModConfig::default()));
+pub static MOD_SUBFOLDERS: GlobalMut<Vec<Option<PathBuf>>> = Lazy::new(|| {
+    let mut paths: Vec<Option<PathBuf>> = helpers::get_subfolder_names(DEFAULT_MODS_FOLDER)
+        .unwrap_or(Vec::new())
+        .into_iter()
+        .map(|p| Some(p))
+        .collect();
 
-pub static DIRECTION_P1: AtomicIsize = AtomicIsize::new(0);
-pub static DIRECTION_P2: AtomicIsize = AtomicIsize::new(0);
+    paths.insert(0, None);
 
-pub static X_POSITION_P1: AtomicIsize = AtomicIsize::new(0);
-pub static X_POSITION_P2: AtomicIsize = AtomicIsize::new(0);
-
-pub static Y_POSITION_P1: AtomicIsize = AtomicIsize::new(0);
-pub static Y_POSITION_P2: AtomicIsize = AtomicIsize::new(0);
-
-pub static X_VELOCITY_P1: AtomicIsize = AtomicIsize::new(0);
-pub static X_VELOCITY_P2: AtomicIsize = AtomicIsize::new(0);
-
-pub static Y_VELOCITY_P1: AtomicIsize = AtomicIsize::new(0);
-pub static Y_VELOCITY_P2: AtomicIsize = AtomicIsize::new(0);
-
-pub static HEALTH_P1: AtomicIsize = AtomicIsize::new(0);
-pub static HEALTH_P2: AtomicIsize = AtomicIsize::new(0);
-
-pub static TENSION_PULSE_P1: AtomicIsize = AtomicIsize::new(0);
-pub static TENSION_PULSE_P2: AtomicIsize = AtomicIsize::new(0);
-
-pub static SCRIPT_PAWN_ADDR: GlobalMut<[u32; 7]> = Lazy::new(|| Mutex::new([0; 7]));
+    Mutex::new(paths)
+});
+pub static SELECTED_MOD_FOLDER: GlobalMut<PathBuf> = Lazy::new(|| {
+    Mutex::new(DEFAULT_MODS_FOLDER.into())
+});
 
 /// The folder where all .bbscript files are held
-pub const MODS_FOLDER: &str = r"..\..\Mods\";
+pub const DEFAULT_MODS_FOLDER: &str = r"..\..\Mods\";
 pub const DUMPED_SCRIPTS_FOLDER: &str = r"..\..\Dumped Scripts\";
 pub const CONFIG_PATH: &str = r".\rev2mod_config.toml";
 

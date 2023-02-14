@@ -47,7 +47,7 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
         _ => {}
     };
 
-    return TRUE;
+    TRUE
 }
 
 unsafe fn initialize() {
@@ -105,9 +105,13 @@ unsafe fn initialize() {
 
     info!("Initializing");
 
-    info!(
+    std::panic::set_hook(Box::new(|panic_info| {
+        error!("PANIC: {}", panic_info.to_string())
+    }));
+
+    debug!(
         "Mods folder created: {}",
-        fs::create_dir(global::MODS_FOLDER).is_ok()
+        fs::create_dir(global::DEFAULT_MODS_FOLDER).is_ok()
     );
 
     debug!("UI hooks initializing...");
@@ -119,11 +123,6 @@ unsafe fn initialize() {
         ui_result = ui::ui_hooks::init_ui();
     }
     info!("UI hook success!");
-
-    debug!("Waiting for Endscene call to hook game");
-    while !global::GAME_UNPACKED.load(Ordering::SeqCst) {
-        thread::sleep(std::time::Duration::from_millis(10));
-    }
 
     info!("Initializing game hooks...");
     let game_result = game::hooks::init_game_hooks();

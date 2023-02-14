@@ -7,34 +7,9 @@ use std::ffi::CStr;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static mut ENGINE_PTR: *mut u8 = ptr::null_mut();
-static mut STATE_PTR: *mut u8 = ptr::null_mut();
-static mut RNG_PTR: *mut u8 = ptr::null_mut();
-static mut CAMERA_PTR: *mut u8 = ptr::null_mut();
-
 use detour::static_detour;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-#[derive(Clone)]
-pub struct XrdState {
-    engine: Vec<u8>,
-    obj_array: Vec<Vec<u8>>,
-    chara_array: Vec<Vec<u8>>,
-    screen_manager: Vec<u8>,
-    battle_state: Vec<u8>,
-    rng_seed: Vec<u8>,
-    camera: Vec<u8>,
-}
-
-static mut GAME_STATE: XrdState = XrdState {
-    engine: Vec::new(),
-    obj_array: Vec::new(),
-    chara_array: Vec::new(),
-    screen_manager: Vec::new(),
-    battle_state: Vec::new(),
-    rng_seed: Vec::new(),
-    camera: Vec::new(),
-};
 
 static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
@@ -49,111 +24,14 @@ static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
 static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
 
-pub unsafe fn load_state() {
-    if !ENGINE_PTR.is_null() {
-        //std::ptr::copy_nonoverlapping(GAME_STATE.ENGINE_1.as_mut_ptr(), ENGINE_PTR, 0x1398);
-        std::ptr::copy_nonoverlapping(
-            GAME_STATE.engine.as_mut_ptr(),
-            ENGINE_PTR.offset(0x445128),
-            0x8BED4,
-        );
-        load_obj();
-        load_chara();
-        std::ptr::copy_nonoverlapping(
-            GAME_STATE.screen_manager.as_mut_ptr(),
-            STATE_PTR.offset(4622944),
-            0x188,
-        );
-        std::ptr::copy_nonoverlapping(
-            GAME_STATE.battle_state.as_mut_ptr(),
-            STATE_PTR.offset(4623564),
-            0x14C,
-        );
-        std::ptr::copy_nonoverlapping(GAME_STATE.rng_seed.as_mut_ptr(), RNG_PTR, 0x1398);
-        std::ptr::copy_nonoverlapping(GAME_STATE.camera.as_mut_ptr(), CAMERA_PTR, 0x200);
-    }
-}
-
-pub unsafe fn load_obj() {
-    let mut index = 0;
-    let mut active_state_ptr: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
-    for obj in &GAME_STATE.obj_array {
-        let active_state: u8 = obj[0xC];
-        if active_state > 0 {
-            std::ptr::copy_nonoverlapping(
-                obj.as_ptr(),
-                ENGINE_PTR.offset(0x1398 + (index * 0x2840)),
-                0x2840,
-            );
-        } else {
-            *active_state_ptr = 0;
-        }
-        index += 1;
-        active_state_ptr = active_state_ptr.offset(0x2840);
-    }
-}
-
-pub unsafe fn load_chara() {
-    std::ptr::copy_nonoverlapping(
-        GAME_STATE.chara_array[0].as_ptr(),
-        ENGINE_PTR.offset(0x3EF798),
-        0x2ACC8,
-    );
-    std::ptr::copy_nonoverlapping(
-        GAME_STATE.chara_array[1].as_ptr(),
-        ENGINE_PTR.offset(0x41A460),
-        0x2ACC8,
-    );
-}
-
-pub unsafe fn save_state() {
-    if !ENGINE_PTR.is_null() {
-        //GAME_STATE.ENGINE_1 = std::slice::from_raw_parts_mut(ENGINE_PTR, 0x1398).to_vec();
-        GAME_STATE.engine =
-            std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x445128), 0x8BED4).to_vec();
-        save_obj();
-        save_chara();
-        GAME_STATE.screen_manager =
-            std::slice::from_raw_parts_mut(STATE_PTR.offset(4622944), 0x188).to_vec();
-        GAME_STATE.battle_state =
-            std::slice::from_raw_parts_mut(STATE_PTR.offset(4623564), 0x14C).to_vec();
-        GAME_STATE.rng_seed = std::slice::from_raw_parts_mut(RNG_PTR, 0x1398).to_vec();
-        GAME_STATE.camera = std::slice::from_raw_parts_mut(CAMERA_PTR, 0x200).to_vec();
-    }
-}
-
-pub unsafe fn save_obj() {
-    let mut index = 0;
-    let mut active_state: *mut u8 = ENGINE_PTR.offset(0x1398 + 0xC);
-    for mut _obj in &mut GAME_STATE.obj_array {
-        if *active_state > 0 {
-            _obj = std::slice::from_raw_parts_mut(
-                ENGINE_PTR.offset(0x1398 + (index * 0x2840)),
-                0x2840,
-            )
-            .to_vec()
-            .as_mut();
-        }
-        index += 1;
-        active_state = active_state.offset(0x2840);
-    }
-}
-
-pub unsafe fn save_chara() {
-    GAME_STATE.chara_array[0] =
-        std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798), 0x2ACC8).to_vec();
-    GAME_STATE.chara_array[1] =
-        std::slice::from_raw_parts_mut(ENGINE_PTR.offset(0x3EF798 + 0x2ACC8), 0x2ACC8).to_vec();
-}
-
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     let update_battle_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-    // UpdateBattleHook
-    //     .initialize(update_battle_fn, |x, b| {
-    //         update_battle_hook(x, b);
-    //     })?
-    //     .enable()?;
+    UpdateBattleHook
+        .initialize(update_battle_fn, |x, b| {
+            update_battle_hook(x, b);
+        })?
+        .enable()?;
 
     let control_battle_object_fn = make_fn!(offset::FN_CONTROL_BATTLE_OBJECT.get_address() => unsafe extern "thiscall" fn (*mut u8));
 
@@ -163,15 +41,6 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
             ControlBattleObjectHook.call(x)
         })?
         .enable()?;
-
-    let setup_fn =
-        make_fn!(offset::FN_SETUP.get_address() => unsafe extern "thiscall" fn (*mut u8));
-
-    // SetupHook
-    //     .initialize(setup_fn, |x| {
-    //         setup_hook(x);
-    //     })?
-    //     .enable()?;
 
     let load_bbscript_fn =
         make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => internal::FnLoadBBScript);
@@ -183,101 +52,18 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     Ok(())
 }
 
-unsafe fn setup_hook(state_ptr: *mut u8) {
-    SetupHook.call(state_ptr);
-    ENGINE_PTR = state_ptr;
-    let rng: *mut *mut u8 = offset::RNG.get_address() as *mut *mut u8;
-    RNG_PTR = *rng as *mut u8;
-    let camera: *mut *mut u8 = offset::CAMERA.get_address() as *mut *mut u8;
-    CAMERA_PTR = *camera as *mut u8;
-    GAME_STATE.obj_array = vec![vec!(0; 0x2840); 400];
-    GAME_STATE.chara_array = vec![vec!(0; 0x2ACC8); 2];
-}
-
 unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
     puffin::profile_function!();
 
     let state: *mut *mut u8 = offset::GAME_STATE.get_address() as *mut *mut u8;
-    let state_ptr: *mut u8 = (*state as *mut u8).offset(4);
-    STATE_PTR = *state;
+    let _state_ptr: *mut u8 = (*state as *mut u8).offset(4);
+
     {
         puffin::profile_scope!("AREDGameInfo_Battle::UpdateBattle");
         UpdateBattleHook.call(game_state, update_draw);
     }
 
-    use crate::helpers::read_type;
-    const P1_OFFSET: isize = 0x3EF798;
-    const P2_OFFSET: isize = 0x41A460;
-
-    const DIRECTION_OFFSET: isize = 0x248;
-    const X_POSITION_OFFSET: isize = 0x24C;
-    const Y_POSITION_OFFSET: isize = 0x250;
-    const X_VELOCITY_OFFSET: isize = 0x2FC;
-    const Y_VELOCITY_OFFSET: isize = 0x300;
-    const HEALTH_OFFSET: isize = 0x9CC;
-    const TENSION_PULSE_OFFSET: isize = 0x2ac58;
-
-    // let config = global::CONFIG.lock();
-
-    let p1 = state_ptr.offset(P1_OFFSET);
-    let p2 = state_ptr.offset(P2_OFFSET);
-
-    global::DIRECTION_P1.store(
-        read_type::<i32>(p1.offset(DIRECTION_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::DIRECTION_P2.store(
-        read_type::<i32>(p2.offset(DIRECTION_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::X_POSITION_P1.store(
-        read_type::<i32>(p1.offset(X_POSITION_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::X_POSITION_P2.store(
-        read_type::<i32>(p2.offset(X_POSITION_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::Y_POSITION_P1.store(
-        read_type::<i32>(p1.offset(Y_POSITION_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::Y_POSITION_P2.store(
-        read_type::<i32>(p2.offset(Y_POSITION_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::X_VELOCITY_P1.store(
-        read_type::<i32>(p1.offset(X_VELOCITY_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::X_VELOCITY_P2.store(
-        read_type::<i32>(p2.offset(X_VELOCITY_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::Y_VELOCITY_P1.store(
-        read_type::<i32>(p1.offset(Y_VELOCITY_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::Y_VELOCITY_P2.store(
-        read_type::<i32>(p2.offset(Y_VELOCITY_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::HEALTH_P1.store(
-        read_type::<i32>(p1.offset(HEALTH_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::HEALTH_P2.store(
-        read_type::<i32>(p2.offset(HEALTH_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::TENSION_PULSE_P1.store(
-        read_type::<i32>(p1.offset(TENSION_PULSE_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
-    global::TENSION_PULSE_P2.store(
-        read_type::<i32>(p2.offset(TENSION_PULSE_OFFSET)) as isize,
-        Ordering::SeqCst,
-    );
+    // currently not reading from correct offsets
 }
 
 // Hook for the fn that transfers script pointers.
@@ -386,10 +172,6 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
             5 => script_storage.common_ef = script,
             _ => {}
         }
-
-        let mut pawns = global::SCRIPT_PAWN_ADDR.lock();
-
-        pawns[count] = this as u32;
 
         let mods_enabled = config.mods_enabled;
         debug!("Mods enabled: {}", mods_enabled);

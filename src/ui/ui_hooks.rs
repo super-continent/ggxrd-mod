@@ -52,8 +52,7 @@ unsafe fn get_d3d9_device_wndclass() -> Result<*mut IDirect3DDevice9, ModError> 
         let err_code = GetLastError();
         UnregisterClassW(wndclass.lpszClassName, wndclass.hInstance);
         return Err(ModError::GetDeviceFailed(format!(
-            "RegisterClassExW failed with error {:#08X}",
-            err_code
+            "RegisterClassExW failed with error {err_code:#08X}"
         )));
     }
 
@@ -191,15 +190,13 @@ fn peek_message_w_hook(
 fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
     puffin::profile_function!();
     unsafe {
-        crate::global::GAME_UNPACKED.store(true, std::sync::atomic::Ordering::SeqCst);
-
         let profiled_endscene = |device| {
             puffin::profile_scope!("EndScene");
             let return_value = EndSceneHook.call(device);
 
             puffin::GlobalProfiler::lock().new_frame();
 
-            return return_value;
+            return_value
         };
 
         // trace!("endscene called");
@@ -239,24 +236,16 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             };
 
             state.window = Some(new_window);
-
-            {
-                // debug!("setting wndproc hook");
-                // GAME_WINDOW_HWND.store(creation_params.hFocusWindow as usize, Ordering::SeqCst);
-                // set_window_long_ptr(creation_params.hFocusWindow, GWLP_WNDPROC, wnd_proc as i32);
-                // debug!("set wndproc hook");
-            }
         }
 
         // Should always be Some
-        if let Some(wind) = state.window.as_mut() {
-            if let Err(e) = wind.prepare_frame(&mut state.im_ctx) {
-                // Handles error of possibly setting wndproc for wrong window, should never happen.
-                error!("Error calling Win32Impl::prepare_frame: {}", e);
+        let wind = state.window.as_mut().unwrap();
+        if let Err(e) = wind.prepare_frame(&mut state.im_ctx) {
+            // Handles error of possibly setting wndproc for wrong window, should never happen.
+            error!("Error calling Win32Impl::prepare_frame: {}", e);
 
-                drop(state.window.take());
-                return profiled_endscene(device);
-            }
+            state.window = None;
+            return profiled_endscene(device);
         }
 
         let ui = gui::ui_loop(state.im_ctx.frame());
@@ -273,12 +262,6 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             error!("could not render draw data: {}", e);
         };
 
-        // if get_window_long(GAME_WINDOW_HWND.load(Ordering::SeqCst) as HWND, GWL_WNDPROC)
-        //     != wnd_proc as i32
-        // {
-        //     debug!("detected incorrect wndproc! resetting");
-        //     drop(state.window.take())
-        // }
         profiled_endscene(device)
     }
 }
