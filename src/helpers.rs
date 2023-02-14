@@ -1,4 +1,5 @@
 use std::os::windows::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
 use std::{ffi::OsStr, mem};
 
 use winapi::um::memoryapi::ReadProcessMemory;
@@ -36,10 +37,10 @@ pub unsafe fn set_window_long_ptr(hwnd: HWND, index: c_int, new_long: i32) -> i3
 }
 
 pub unsafe fn get_window_long(hwnd: HWND, n_index: INT) -> LONG {
-    return match IsWindowUnicode(hwnd) {
+    match IsWindowUnicode(hwnd) {
         0 => GetWindowLongA(hwnd, n_index),
         _ => GetWindowLongW(hwnd, n_index),
-    };
+    }
 }
 
 pub unsafe fn get_module_base() -> HINSTANCE {
@@ -71,7 +72,7 @@ pub fn win32_wstring(val: &str) -> Vec<u16> {
 #[macro_export]
 macro_rules! pattern {
     ( $( $x:tt ),* ) => {
-        crate::helpers::AobSignature::new(
+        $crate::helpers::AobSignature::new(
             &[ $( pattern!(@ONE_ELEMENT $x), )* ]
         )
     };
@@ -79,8 +80,7 @@ macro_rules! pattern {
     (@ONE_ELEMENT _) => { None };
 }
 
-/// Type for storing offsets and AOB scans
-/// for finding the offset of something within a running program
+/// Type for storing offsets to memory
 pub struct Offset(u32);
 
 impl Offset {
@@ -140,11 +140,7 @@ impl<'a> AobSignature<'a> {
         );
 
         debug!("patlen = {}, bufferlen = {}", self.0.len(), buffer.len());
-        if let Some(offset) = scan_aob(&buffer, self.0) {
-            Some(module as u32 + offset as u32)
-        } else {
-            None
-        }
+        scan_aob(&buffer, self.0).map(|offset| module as u32 + offset as u32)
     }
 }
 
@@ -169,9 +165,7 @@ pub fn scan_aob(haystack: &[u8], needle: &[Option<u8>]) -> Option<usize> {
     while haystack_idx < haystack_len {
         let mut hay_idx = haystack_idx;
         for pat_idx in (0..pattern_len).rev() {
-            if !(needle[pat_idx as usize].is_none()
-                || needle[pat_idx as usize] == Some(haystack[hay_idx as usize]))
-            {
+            if !(needle[pat_idx].is_none() || needle[pat_idx] == Some(haystack[hay_idx])) {
                 break;
             }
 
@@ -186,4 +180,22 @@ pub fn scan_aob(haystack: &[u8], needle: &[Option<u8>]) -> Option<usize> {
     }
 
     None
+}
+
+pub fn get_subfolder_names(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
+    let iter = std::fs::read_dir(path.as_ref())?;
+
+    // filter by DirEntries which exist and are directories
+    // then map to PathBufs containing only the directory name
+    let paths = iter
+        .filter_map(|dir_entry| {
+            dir_entry.ok().filter(|p| p.path().is_dir()).map(|entry| {
+                let path = entry.path();
+                let name = path.file_name().expect("should have a file name");
+
+                PathBuf::from(name)
+            })
+        })
+        .collect();
+    Ok(paths)
 }
