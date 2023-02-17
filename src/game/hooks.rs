@@ -55,8 +55,8 @@ pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
 unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
     puffin::profile_function!();
 
-    let state: *mut *mut u8 = offset::GAME_STATE.get_address() as *mut *mut u8;
-    let _state_ptr: *mut u8 = (*state as *mut u8).offset(4);
+    // let state: *mut *mut u8 = offset::GAME_STATE.get_address() as *mut *mut u8;
+    // let _state_ptr: *mut u8 = (*state as *mut u8).offset(4);
 
     {
         puffin::profile_scope!("AREDGameInfo_Battle::UpdateBattle");
