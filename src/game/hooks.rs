@@ -27,11 +27,11 @@ static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(Sc
 pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
     let update_battle_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-    UpdateBattleHook
-        .initialize(update_battle_fn, |x, b| {
-            update_battle_hook(x, b);
-        })?
-        .enable()?;
+    // UpdateBattleHook
+    //     .initialize(update_battle_fn, |x, b| {
+    //         update_battle_hook(x, b);
+    //     })?;
+    //     .enable()?;
 
     let control_battle_object_fn = make_fn!(offset::FN_CONTROL_BATTLE_OBJECT.get_address() => unsafe extern "thiscall" fn (*mut u8));
 
