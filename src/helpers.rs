@@ -150,7 +150,6 @@ pub fn scan_aob(haystack: &[u8], needle: &[Option<u8>]) -> Option<usize> {
     let (pattern_len, haystack_len) = (needle.len(), haystack.len());
 
     if pattern_len > haystack_len {
-        debug!("pattern length greater than haystack length!");
         panic!("pattern length must be less than haystack length")
     }
 

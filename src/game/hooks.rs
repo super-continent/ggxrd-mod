@@ -7,7 +7,7 @@ use std::ffi::CStr;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use detour::static_detour;
+use retour::static_detour;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
@@ -24,7 +24,7 @@ static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
 static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
 
-pub unsafe fn init_game_hooks() -> Result<(), detour::Error> {
+pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     let update_battle_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
 
     // UpdateBattleHook

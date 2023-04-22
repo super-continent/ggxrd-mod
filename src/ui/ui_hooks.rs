@@ -8,7 +8,7 @@ use std::ffi::CString;
 use std::mem;
 use std::{error::Error, ptr};
 
-use detour::static_detour;
+use retour::static_detour;
 use imgui_dx9_renderer::Renderer;
 use imgui_impl_win32_rs::*;
 use once_cell::sync::Lazy;
