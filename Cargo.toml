@@ -16,6 +16,7 @@ save-state = []
 # default = ["save-state"]
 
 [dependencies]
+sigscan = { git = "https://github.com/super-continent/sigscan" }
 imgui-impl-win32-rs = { git = "https://github.com/super-continent/imgui-impl-win32-rs" }
 imgui-dx9-renderer = "0"
 winapi = { version = "0", features = [
@@ -39,3 +40,4 @@ dashmap = "5.3"
 puffin-imgui = "0.17"
 puffin = "0.13"
 once_cell = { version = "1.13", features = ["parking_lot"] }
+region = "3.0.0"

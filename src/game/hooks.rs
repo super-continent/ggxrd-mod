@@ -1,15 +1,16 @@
 use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::game::get_script_filename;
 use crate::global::GlobalMut;
+use crate::helpers::get_aob_offset;
 use crate::{global, make_fn};
 
 use std::ffi::CStr;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use retour::static_detour;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use retour::static_detour;
 
 static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
@@ -25,25 +26,31 @@ static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
 
 pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
-    let update_battle_fn = make_fn!(offset::FN_UPDATE_BATTLE.get_address() => unsafe extern "thiscall" fn (*mut u8, bool));
+    let update_battle_fn = make_fn!(get_aob_offset(&offset::FN_UPDATE_BATTLE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-    // UpdateBattleHook
-    //     .initialize(update_battle_fn, |x, b| {
-    //         update_battle_hook(x, b);
-    //     })?;
-    //     .enable()?;
+    log::debug!("update_battle: {}", update_battle_fn as usize);
 
-    let control_battle_object_fn = make_fn!(offset::FN_CONTROL_BATTLE_OBJECT.get_address() => unsafe extern "thiscall" fn (*mut u8));
+    UpdateBattleHook
+        .initialize(update_battle_fn, |x, b| {
+            update_battle_hook(x, b);
+        })?
+        .enable()?;
+
+    let control_battle_object_fn = make_fn!(get_aob_offset(&offset::FN_CONTROL_BATTLE_OBJECT).unwrap() => unsafe extern "thiscall" fn (*mut u8));
+
+    log::debug!("control_battle_object: {}", control_battle_object_fn as usize);
 
     ControlBattleObjectHook
         .initialize(control_battle_object_fn, |x| {
             puffin::profile_scope!("CObjectManager::ControlBattleObject");
             ControlBattleObjectHook.call(x)
-        })?
-        .enable()?;
+        })?;
+        // .enable()?;
 
     let load_bbscript_fn =
-        make_fn!(offset::FN_LOAD_BBSCRIPT.get_address() => internal::FnLoadBBScript);
+        make_fn!(get_aob_offset(&offset::FN_LOAD_BBSCRIPT).unwrap() => internal::FnLoadBBScript);
+
+    log::debug!("load_bbscript: {}", load_bbscript_fn as usize);
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?
