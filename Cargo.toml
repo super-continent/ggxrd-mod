@@ -29,7 +29,7 @@ winapi = { version = "0", features = [
     "psapi",
 ] }
 imgui = "0.8"
-retour = "0"
+retour = { version = "0.3", features = ["static-detour", "thiscall-abi"] }
 parking_lot = "0"
 log = { version = "0", features = ["serde"] }
 simplelog = "0"
