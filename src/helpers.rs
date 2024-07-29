@@ -18,13 +18,23 @@ use winapi::{
     },
 };
 
-use crate::error::ModError;
-
 #[macro_export]
 macro_rules! make_fn {
     ($address:expr => $fn_type:ty) => {
         std::mem::transmute::<*const usize, $fn_type>($address as *const usize)
     };
+}
+
+/// Follow some chain of offsets from a pointer to get a pointer to data.
+/// `[0x0, 0x10, 0x8]` will offset by `0x0`, dereference, offset by `0x10`, dereference, 
+/// then offset by `0x8`, dereference, and return the resulting pointer.
+pub unsafe fn pointer_chain(mut ptr: *mut u8, offsets: impl AsRef<[isize]>) -> *mut u8 {
+    for offset in offsets.as_ref() {
+        // offset ptr and then deref
+        ptr = *(ptr.offset(*offset) as *mut *mut u8);
+    }
+
+    ptr
 }
 
 pub unsafe fn read_type<T: Sized>(ptr: *mut u8) -> T {
@@ -62,17 +72,23 @@ pub unsafe fn get_aob_offset(pattern: &SigScan) -> Option<usize> {
     );
     let module_size = module_info.SizeOfImage;
 
-    let _guard = match region::protect_with_handle(base, module_size as usize, region::Protection::READ_WRITE_EXECUTE) {
+    let _guard = match region::protect_with_handle(
+        base,
+        module_size as usize,
+        region::Protection::READ_WRITE_EXECUTE,
+    ) {
         Ok(guard) => guard,
         Err(e) => {
             log::error!("error protecting memory: {}", e);
-            return None
-        },
+            return None;
+        }
     };
 
     let scan_region = std::slice::from_raw_parts(base as *mut u8, module_size as usize);
 
-    pattern.scan(scan_region).map(|offset| offset + base as usize)
+    pattern
+        .scan(scan_region)
+        .map(|offset| offset + base as usize)
 }
 
 pub unsafe fn call_wndproc(
@@ -97,16 +113,16 @@ pub fn win32_wstring(val: &str) -> Vec<u16> {
 }
 
 /// Type for storing offsets to memory
-pub struct Offset(u32);
+pub struct Offset(usize);
 
 impl Offset {
     /// Create an [`Offset`] that calculates the offset of a programs base address
-    pub const fn new(offset: u32) -> Self {
+    pub const fn new(offset: usize) -> Self {
         Self(offset)
     }
 
-    pub unsafe fn get_address(&self) -> u32 {
-        let base = get_module_base() as u32;
+    pub unsafe fn get_address(&self) -> usize {
+        let base = get_module_base() as usize;
         base + self.0
     }
 }

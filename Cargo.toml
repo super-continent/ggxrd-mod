@@ -8,12 +8,11 @@ edition = "2021"
 [lib]
 name = "rev2hook"
 path = "src/lib.rs"
-crate_type = ["cdylib"]
+crate-type = ["cdylib"]
 
 [features]
-save-state = []
-
-# default = ["save-state"]
+sammi = ["tokio", "reqwest", "serde_json"]
+default = ["sammi"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }
@@ -41,3 +40,6 @@ puffin-imgui = "0.17"
 puffin = "0.13"
 once_cell = { version = "1.13", features = ["parking_lot"] }
 region = "3.0.0"
+serde_json = { version = "1.0.120", optional = true }
+tokio = { version = "1.39.1", features = ["rt", "sync"], optional = true }
+reqwest = { version = "0.12.5", optional = true }

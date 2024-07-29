@@ -1,9 +1,9 @@
-#![feature(once_cell, abi_thiscall)]
-
 mod error;
 mod game;
 mod global;
 mod helpers;
+#[cfg(feature = "sammi")]
+mod sammi;
 mod ui;
 
 use std::ffi::{CString, OsString};
@@ -14,7 +14,6 @@ use std::mem;
 use std::os::windows::ffi::OsStringExt;
 
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::thread;
 
 #[macro_use]
@@ -42,7 +41,21 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
 
     match attach_reason {
         DLL_PROCESS_ATTACH => {
-            thread::spawn(|| unsafe { initialize() });
+            // if sammi is used we set up the message passing state
+            if cfg!(feature = "sammi") {
+                let (tx, rx) = tokio::sync::mpsc::channel(2);
+                global::MESSAGE_SENDER.get_or_init(move || tx);
+                thread::spawn(|| unsafe { initialize() });
+
+                thread::spawn(move || {
+                    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+                    runtime.block_on(async move {
+                        sammi::message_handler(rx).await;
+                    });
+                });
+            } else {
+                thread::spawn(|| unsafe { initialize() });
+            }
         }
         _ => {}
     };

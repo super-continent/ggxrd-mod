@@ -38,14 +38,16 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
     let control_battle_object_fn = make_fn!(get_aob_offset(&offset::FN_CONTROL_BATTLE_OBJECT).unwrap() => unsafe extern "thiscall" fn (*mut u8));
 
-    log::debug!("control_battle_object: {}", control_battle_object_fn as usize);
+    log::debug!(
+        "control_battle_object: {}",
+        control_battle_object_fn as usize
+    );
 
-    ControlBattleObjectHook
-        .initialize(control_battle_object_fn, |x| {
-            puffin::profile_scope!("CObjectManager::ControlBattleObject");
-            ControlBattleObjectHook.call(x)
-        })?;
-        // .enable()?;
+    ControlBattleObjectHook.initialize(control_battle_object_fn, |x| {
+        puffin::profile_scope!("CObjectManager::ControlBattleObject");
+        ControlBattleObjectHook.call(x)
+    })?;
+    // .enable()?;
 
     let load_bbscript_fn =
         make_fn!(get_aob_offset(&offset::FN_LOAD_BBSCRIPT).unwrap() => internal::FnLoadBBScript);
@@ -60,17 +62,16 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 }
 
 unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
-    puffin::profile_function!();
+    UpdateBattleHook.call(game_state, update_draw);
 
-    // let state: *mut *mut u8 = offset::GAME_STATE.get_address() as *mut *mut u8;
-    // let _state_ptr: *mut u8 = (*state as *mut u8).offset(4);
-
-    {
-        puffin::profile_scope!("AREDGameInfo_Battle::UpdateBattle");
-        UpdateBattleHook.call(game_state, update_draw);
+    #[cfg(feature = "sammi")]
+    // only collect data on frames that are not rollback simulations
+    // with 30fps limit
+    if update_draw {
+        crate::sammi::collect_info_sammi(game_state);
+        //log::debug!("state: {:X}", game_state as usize);
     }
 
-    // currently not reading from correct offsets
 }
 
 // Hook for the fn that transfers script pointers.

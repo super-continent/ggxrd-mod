@@ -1,5 +1,6 @@
-use crate::global;
+use crate::global::{self, MESSAGE_SENDER};
 use crate::global::GlobalMut;
+use crate::sammi;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -88,6 +89,9 @@ pub fn ui_loop(ui: Ui) -> Ui {
                     if ui.checkbox("Dump game scripts", &mut dump_scripts) {
                         config.dump_scripts = dump_scripts
                     };
+
+                    ui.input_text("Sammi API", &mut config.sammi.api_url).build();
+                    ui.input_text("Sammi Webhook", &mut config.sammi.webhook_url).build();
 
                     if ui.button("Save Config") {
                         save_config(config.clone())
