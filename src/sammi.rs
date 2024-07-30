@@ -123,7 +123,6 @@ pub enum HitType {
     Unknown,
 }
 
-
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PlayerState {
     character: Character,
@@ -150,7 +149,6 @@ impl PlayerState {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SammiState {
@@ -267,9 +265,12 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         |arr: &[u8]| String::from(CStr::from_bytes_until_nul(&arr).unwrap().to_str().unwrap());
 
     // current state
-    new_state.player_1.state = process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
-    new_state.player_2.state = process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
+    new_state.player_1.state =
+        process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
+    new_state.player_2.state =
+        process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
+    // round wins
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
     new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
 
@@ -288,7 +289,8 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
     let is_blocking_p2 = (helpers::read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
 
     if !is_blocking_p1
-        && (last_hit_type_p1 != LAST_HIT_P1 || new_state.player_1.health < PREVIOUS_STATE.player_1.health)
+        && (last_hit_type_p1 != LAST_HIT_P1
+            || new_state.player_1.health < PREVIOUS_STATE.player_1.health)
     {
         let hit_type = match last_hit_type_p1 {
             0 => HitType::Normal,
@@ -301,7 +303,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         let mut attacker_state = new_state.player_2.state.clone();
 
         // if projectile then store projectile data
-        if last_hit_obj_p1 != player_2 {
+        if last_hit_obj_p1 != player_2 && !last_hit_obj_p1.is_null() {
             attacker = ObjectId::Projectile;
             attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
                 last_hit_obj_p1.offset(0x2444),
@@ -319,7 +321,8 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
     // do it again for p2
     if !is_blocking_p2
-        && (last_hit_type_p2 != LAST_HIT_P2 || new_state.player_2.health < PREVIOUS_STATE.player_2.health)
+        && (last_hit_type_p2 != LAST_HIT_P2
+            || new_state.player_2.health < PREVIOUS_STATE.player_2.health)
     {
         let hit_type = match last_hit_type_p2 {
             0 => HitType::Normal,
@@ -331,7 +334,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         let mut attacker = ObjectId::Player1;
         let mut attacker_state = new_state.player_1.state.clone();
 
-        if last_hit_obj_p2 != player_1 {
+        if last_hit_obj_p2 != player_1 && !last_hit_obj_p2.is_null() {
             attacker = ObjectId::Projectile;
             attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
                 last_hit_obj_p2.offset(0x2444),
