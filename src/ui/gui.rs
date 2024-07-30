@@ -1,5 +1,5 @@
-use crate::global::{self, MESSAGE_SENDER};
 use crate::global::GlobalMut;
+use crate::global::{self, MESSAGE_SENDER};
 use crate::sammi;
 
 use std::borrow::Cow;
@@ -90,8 +90,17 @@ pub fn ui_loop(ui: Ui) -> Ui {
                         config.dump_scripts = dump_scripts
                     };
 
-                    ui.input_text("Webhook URL", &mut config.sammi.webhook_url).build();
+                    if ui.checkbox("Dump game scripts", &mut dump_scripts) {
+                        config.dump_scripts = dump_scripts
+                    };
 
+                    #[cfg(feature = "sammi")]
+                    {
+                        ui.checkbox("Enable SAMMI", &mut config.sammi.sammi_enabled);
+                        sammi::SAMMI_ENABLED.store(config.sammi.sammi_enabled, Ordering::Relaxed);
+                        ui.input_text("Webhook URL", &mut config.sammi.webhook_url)
+                            .build();
+                    }
                     if ui.button("Save Config") {
                         save_config(config.clone())
                     }

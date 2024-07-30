@@ -9,7 +9,8 @@ use crate::{helpers, sammi};
 pub type GlobalMut<T> = Lazy<Mutex<T>>;
 
 #[cfg(feature = "sammi")]
-pub static MESSAGE_SENDER: OnceCell<tokio::sync::mpsc::Sender<sammi::SammiMessage>> = OnceCell::new();
+pub static MESSAGE_SENDER: OnceCell<tokio::sync::mpsc::Sender<sammi::SammiMessage>> =
+    OnceCell::new();
 
 pub static CONFIG: GlobalMut<ModConfig> = Lazy::new(|| Mutex::new(ModConfig::default()));
 pub static MOD_SUBFOLDERS: GlobalMut<Vec<Option<PathBuf>>> = Lazy::new(|| {
@@ -38,6 +39,8 @@ pub struct ModConfig {
     pub display_ui_on_start: bool,
     pub dump_scripts: bool,
     pub log_level: log::LevelFilter,
+
+    #[cfg(feature = "sammi")]
     pub sammi: sammi::SammiConfig,
 }
 
@@ -48,6 +51,8 @@ impl Default for ModConfig {
             display_ui_on_start: true,
             dump_scripts: false,
             log_level: log::LevelFilter::Info,
+
+            #[cfg(feature = "sammi")]
             sammi: sammi::SammiConfig::default(),
         }
     }

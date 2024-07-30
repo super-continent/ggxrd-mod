@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::{ffi::CStr, sync::atomic::AtomicBool};
 
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,8 @@ use crate::{
 static SAMMI_CONFIG: Lazy<OnceCell<SammiConfig>> =
     Lazy::new(|| OnceCell::with_value(crate::global::CONFIG.lock().sammi.clone()));
 
+pub static SAMMI_ENABLED: AtomicBool = AtomicBool::new(true);
+
 /// A message passed to the sammi event handler
 #[derive(Debug, Clone)]
 pub enum SammiMessage {
@@ -21,12 +23,14 @@ pub enum SammiMessage {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SammiConfig {
+    pub sammi_enabled: bool,
     pub webhook_url: String,
 }
 
 impl Default for SammiConfig {
     fn default() -> Self {
         Self {
+            sammi_enabled: true,
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
         }
     }
@@ -36,6 +40,7 @@ impl Default for SammiConfig {
 pub enum PlayerId {
     Player1,
     Player2,
+    Projectile,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,26 +226,30 @@ static mut LAST_HIT_P2: usize = 0;
 pub unsafe fn collect_info_sammi(state: *mut u8) {
     const P2_OFFSET: isize = 0x2D198;
 
-    let player = helpers::pointer_chain(state, [0x490, 0x484]);
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
 
+    let player_1 = helpers::pointer_chain(state, [0x490, 0x484]);
+    let player_2 = player_1.offset(P2_OFFSET);
     let mut new_state = SammiState::new();
 
     new_state.character_p1 =
-        Character::from_number(helpers::read_type::<usize>(player.offset(0x44)));
+        Character::from_number(helpers::read_type::<usize>(player_1.offset(0x44)));
     new_state.character_p2 =
-        Character::from_number(helpers::read_type::<usize>(player.offset(P2_OFFSET + 0x44)));
+        Character::from_number(helpers::read_type::<usize>(player_2.offset(0x44)));
 
     // health
-    new_state.health_p1 = helpers::read_type::<isize>(player.offset(0x9CC));
-    new_state.health_p2 = helpers::read_type::<isize>(player.offset(P2_OFFSET + 0x9CC));
+    new_state.health_p1 = helpers::read_type::<isize>(player_1.offset(0x9CC));
+    new_state.health_p2 = helpers::read_type::<isize>(player_2.offset(0x9CC));
 
     // tension pulse
-    new_state.tension_pulse_p1 = helpers::read_type::<isize>(player.offset(0x2D128));
-    new_state.tension_pulse_p2 = helpers::read_type::<isize>(player.offset(P2_OFFSET + 0x2D128));
+    new_state.tension_pulse_p1 = helpers::read_type::<isize>(player_1.offset(0x2D128));
+    new_state.tension_pulse_p2 = helpers::read_type::<isize>(player_2.offset(0x2D128));
 
     // tension bar
-    new_state.tension_p1 = helpers::read_type::<isize>(player.offset(0x2D134));
-    new_state.tension_p2 = helpers::read_type::<isize>(player.offset(P2_OFFSET + 0x2D134));
+    new_state.tension_p1 = helpers::read_type::<isize>(player_1.offset(0x2D134));
+    new_state.tension_p2 = helpers::read_type::<isize>(player_2.offset(0x2D134));
 
     // burst
     let some_engine_static = Offset::new(0x198B6E4).get_address() as *mut *mut u8;
@@ -249,53 +258,84 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
     new_state.burst_p2 = helpers::read_type::<isize>(burst.offset(0x4));
 
     // tension bar
-    new_state.risc_p1 = helpers::read_type::<isize>(player.offset(0x24E30));
-    new_state.risc_p2 = helpers::read_type::<isize>(player.offset(P2_OFFSET + 0x24E30));
+    new_state.risc_p1 = helpers::read_type::<isize>(player_1.offset(0x24E30));
+    new_state.risc_p2 = helpers::read_type::<isize>(player_2.offset(0x24E30));
 
     // turn string buf into String
     let process_string =
         |arr: &[u8]| String::from(CStr::from_bytes_until_nul(&arr).unwrap().to_str().unwrap());
 
-    new_state.state_p1 = process_string(&helpers::read_type::<[u8; 32]>(player.offset(0x2444)));
-    new_state.state_p2 = process_string(&helpers::read_type::<[u8; 32]>(
-        player.offset(P2_OFFSET + 0x2444),
-    ));
+    new_state.state_p1 = process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
+    new_state.state_p2 = process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
-    let last_hit_type_p1 = helpers::read_type::<usize>(player.offset(0x990));
-    let last_hit_type_p2 = helpers::read_type::<usize>(player.offset(P2_OFFSET + 0x990));
+    // type of the last hit recieved
+    let last_hit_type_p1 = helpers::read_type::<usize>(player_1.offset(0x990));
+    let last_hit_type_p2 = helpers::read_type::<usize>(player_2.offset(0x990));
+
+    // pointer to the last object that hit the player
+    let last_hit_obj_p1 = helpers::read_type::<*mut u8>(player_1.offset(0x704));
+    let last_hit_obj_p2 = helpers::read_type::<*mut u8>(player_2.offset(0x704));
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
-    if last_hit_type_p1 != LAST_HIT_P1 || new_state.health_p1 < PREVIOUS_STATE.health_p1 {
+    // filter out hits which are actually chip damage
+    let is_blocking_p1 = (helpers::read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
+    let is_blocking_p2 = (helpers::read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
+
+    if !is_blocking_p1
+        && (last_hit_type_p1 != LAST_HIT_P1 || new_state.health_p1 < PREVIOUS_STATE.health_p1)
+    {
         let hit_type = match last_hit_type_p1 {
             0 => HitType::Normal,
             2 => HitType::Counter,
             3 => HitType::MortalCounter,
             _ => HitType::Unknown,
         };
-        let attacker = PlayerId::Player2;
+
+        let mut attacker = PlayerId::Player2;
+        let mut attacker_state = new_state.state_p2.clone();
+
+        // if projectile then store projectile data
+        if last_hit_obj_p1 != player_2 {
+            attacker = PlayerId::Projectile;
+            attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
+                last_hit_obj_p1.offset(0x2444),
+            ));
+        }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             hit_type,
             attacker,
-            attacker_state: new_state.state_p2.clone(),
+            attacker_state,
         }))
         .unwrap();
     }
 
-    if last_hit_type_p2 != LAST_HIT_P2 || new_state.health_p2 < PREVIOUS_STATE.health_p2 {
+    // do it again for p2
+    if !is_blocking_p2
+        && (last_hit_type_p2 != LAST_HIT_P2 || new_state.health_p2 < PREVIOUS_STATE.health_p2)
+    {
         let hit_type = match last_hit_type_p2 {
             0 => HitType::Normal,
             2 => HitType::Counter,
             3 => HitType::MortalCounter,
             _ => HitType::Unknown,
         };
-        let attacker = PlayerId::Player1;
+
+        let mut attacker = PlayerId::Player1;
+        let mut attacker_state = new_state.state_p1.clone();
+
+        if last_hit_obj_p2 != player_1 {
+            attacker = PlayerId::Projectile;
+            attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
+                last_hit_obj_p2.offset(0x2444),
+            ));
+        }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             hit_type,
             attacker,
-            attacker_state: new_state.state_p1.clone(),
+            attacker_state,
         }))
         .unwrap();
     }
