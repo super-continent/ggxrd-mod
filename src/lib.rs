@@ -43,7 +43,7 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
         DLL_PROCESS_ATTACH => {
             // if sammi is used we set up the message passing state
             if cfg!(feature = "sammi") {
-                let (tx, rx) = tokio::sync::mpsc::channel(2);
+                let (tx, rx) = tokio::sync::mpsc::channel(8);
                 global::MESSAGE_SENDER.get_or_init(move || tx);
                 thread::spawn(|| unsafe { initialize() });
 
