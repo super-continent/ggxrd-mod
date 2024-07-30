@@ -123,47 +123,46 @@ pub enum HitType {
     Unknown,
 }
 
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PlayerState {
+    character: Character,
+    health: isize,
+    tension_pulse: isize,
+    tension: isize,
+    burst: isize,
+    risc: isize,
+    state: String,
+    round_wins: usize,
+}
+
+impl PlayerState {
+    const fn new() -> Self {
+        Self {
+            character: Character::Sol,
+            health: 420,
+            tension_pulse: 0,
+            tension: 0,
+            burst: 0,
+            risc: 0,
+            state: String::new(),
+            round_wins: 0,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SammiState {
-    character_p1: Character,
-    character_p2: Character,
-
-    health_p1: isize,
-    health_p2: isize,
-
-    tension_pulse_p1: isize,
-    tension_pulse_p2: isize,
-
-    tension_p1: isize,
-    tension_p2: isize,
-
-    burst_p1: isize,
-    burst_p2: isize,
-
-    risc_p1: isize,
-    risc_p2: isize,
-
-    state_p1: String,
-    state_p2: String,
+    player_1: PlayerState,
+    player_2: PlayerState,
 }
 
 impl SammiState {
     const fn new() -> Self {
         Self {
-            character_p1: Character::Sol,
-            character_p2: Character::Sol,
-            health_p1: 420,
-            health_p2: 420,
-            tension_pulse_p1: 0,
-            tension_pulse_p2: 0,
-            tension_p1: 0,
-            tension_p2: 0,
-            burst_p1: 0,
-            burst_p2: 0,
-            risc_p1: 0,
-            risc_p2: 0,
-            state_p1: String::new(),
-            state_p2: String::new(),
+            player_1: PlayerState::new(),
+            player_2: PlayerState::new(),
         }
     }
 }
@@ -236,39 +235,39 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
     let player_2 = player_1.offset(P2_OFFSET);
     let mut new_state = SammiState::new();
 
-    new_state.character_p1 =
+    new_state.player_1.character =
         Character::from_number(helpers::read_type::<usize>(player_1.offset(0x44)));
-    new_state.character_p2 =
+    new_state.player_2.character =
         Character::from_number(helpers::read_type::<usize>(player_2.offset(0x44)));
 
     // health
-    new_state.health_p1 = helpers::read_type::<isize>(player_1.offset(0x9CC));
-    new_state.health_p2 = helpers::read_type::<isize>(player_2.offset(0x9CC));
+    new_state.player_1.health = helpers::read_type::<isize>(player_1.offset(0x9CC));
+    new_state.player_2.health = helpers::read_type::<isize>(player_2.offset(0x9CC));
 
     // tension pulse
-    new_state.tension_pulse_p1 = helpers::read_type::<isize>(player_1.offset(0x2D128));
-    new_state.tension_pulse_p2 = helpers::read_type::<isize>(player_2.offset(0x2D128));
+    new_state.player_1.tension_pulse = helpers::read_type::<isize>(player_1.offset(0x2D128));
+    new_state.player_2.tension_pulse = helpers::read_type::<isize>(player_2.offset(0x2D128));
 
     // tension bar
-    new_state.tension_p1 = helpers::read_type::<isize>(player_1.offset(0x2D134));
-    new_state.tension_p2 = helpers::read_type::<isize>(player_2.offset(0x2D134));
+    new_state.player_1.tension = helpers::read_type::<isize>(player_1.offset(0x2D134));
+    new_state.player_2.tension = helpers::read_type::<isize>(player_2.offset(0x2D134));
 
     // burst
     let some_engine_static = Offset::new(0x198B6E4).get_address() as *mut *mut u8;
     let burst = (*some_engine_static).offset(0x1C4B20);
-    new_state.burst_p1 = helpers::read_type::<isize>(burst);
-    new_state.burst_p2 = helpers::read_type::<isize>(burst.offset(0x4));
+    new_state.player_1.burst = helpers::read_type::<isize>(burst);
+    new_state.player_2.burst = helpers::read_type::<isize>(burst.offset(0x4));
 
-    // tension bar
-    new_state.risc_p1 = helpers::read_type::<isize>(player_1.offset(0x24E30));
-    new_state.risc_p2 = helpers::read_type::<isize>(player_2.offset(0x24E30));
+    // risc
+    new_state.player_1.risc = helpers::read_type::<isize>(player_1.offset(0x24E30));
+    new_state.player_2.risc = helpers::read_type::<isize>(player_2.offset(0x24E30));
 
     // turn string buf into String
     let process_string =
         |arr: &[u8]| String::from(CStr::from_bytes_until_nul(&arr).unwrap().to_str().unwrap());
 
-    new_state.state_p1 = process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
-    new_state.state_p2 = process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
+    new_state.player_1.state = process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
+    new_state.player_2.state = process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     // type of the last hit recieved
     let last_hit_type_p1 = helpers::read_type::<usize>(player_1.offset(0x990));
@@ -285,7 +284,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
     let is_blocking_p2 = (helpers::read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
 
     if !is_blocking_p1
-        && (last_hit_type_p1 != LAST_HIT_P1 || new_state.health_p1 < PREVIOUS_STATE.health_p1)
+        && (last_hit_type_p1 != LAST_HIT_P1 || new_state.player_1.health < PREVIOUS_STATE.player_1.health)
     {
         let hit_type = match last_hit_type_p1 {
             0 => HitType::Normal,
@@ -295,7 +294,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         };
 
         let mut attacker = ObjectId::Player2;
-        let mut attacker_state = new_state.state_p2.clone();
+        let mut attacker_state = new_state.player_2.state.clone();
 
         // if projectile then store projectile data
         if last_hit_obj_p1 != player_2 {
@@ -316,7 +315,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
     // do it again for p2
     if !is_blocking_p2
-        && (last_hit_type_p2 != LAST_HIT_P2 || new_state.health_p2 < PREVIOUS_STATE.health_p2)
+        && (last_hit_type_p2 != LAST_HIT_P2 || new_state.player_2.health < PREVIOUS_STATE.player_2.health)
     {
         let hit_type = match last_hit_type_p2 {
             0 => HitType::Normal,
@@ -326,7 +325,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         };
 
         let mut attacker = ObjectId::Player1;
-        let mut attacker_state = new_state.state_p1.clone();
+        let mut attacker_state = new_state.player_1.state.clone();
 
         if last_hit_obj_p2 != player_1 {
             attacker = ObjectId::Projectile;
