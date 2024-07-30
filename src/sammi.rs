@@ -21,18 +21,13 @@ pub enum SammiMessage {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SammiConfig {
-    /// The Sammi API URL
-    pub api_url: String,
     pub webhook_url: String,
-    pub button_id: String,
 }
 
 impl Default for SammiConfig {
     fn default() -> Self {
         Self {
-            api_url: "http://127.0.0.1:9450/api".into(),
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
-            button_id: "ID1".into(),
         }
     }
 }
@@ -178,16 +173,13 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
                     let val = serde_json::ser::to_string(&val).unwrap();
                     let start_time = std::time::Instant::now();
                     let res = new_agent
-                        .post(&config.api_url)
+                        .post(&config.webhook_url)
                         .timeout(std::time::Duration::from_millis(100))
                         .body(format!(
                             "{{
-                                'request': 'setVariable',
-                                'name': 'ggxrd_state',
-                                'buttonID': '{}',
-                                'value': {val}
+                                'trigger': 'ggxrd_stateUpdate',
+                                'state': {val}
                             }}",
-                            config.button_id
                         ))
                         .send()
                         .await;

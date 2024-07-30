@@ -90,8 +90,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
                         config.dump_scripts = dump_scripts
                     };
 
-                    ui.input_text("Sammi API", &mut config.sammi.api_url).build();
-                    ui.input_text("Sammi Webhook", &mut config.sammi.webhook_url).build();
+                    ui.input_text("Webhook URL", &mut config.sammi.webhook_url).build();
 
                     if ui.button("Save Config") {
                         save_config(config.clone())
