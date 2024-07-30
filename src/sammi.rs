@@ -25,6 +25,7 @@ pub enum SammiMessage {
 pub struct SammiConfig {
     pub sammi_enabled: bool,
     pub webhook_url: String,
+    pub frame_skip: usize,
 }
 
 impl Default for SammiConfig {
@@ -32,12 +33,13 @@ impl Default for SammiConfig {
         Self {
             sammi_enabled: true,
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
+            frame_skip: 2,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub enum PlayerId {
+pub enum ObjectId {
     Player1,
     Player2,
     Projectile,
@@ -108,7 +110,8 @@ impl Character {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HitInfo {
     hit_type: HitType,
-    attacker: PlayerId,
+    player_hit: ObjectId,
+    attacker: ObjectId,
     attacker_state: String,
 }
 
@@ -217,8 +220,7 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
     }
 }
 
-// only sends sammi data every other frame of the match
-static mut EVEN_FRAME: bool = true;
+static mut FRAME_COUNTER: usize = 0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
 static mut LAST_HIT_P1: usize = 0;
@@ -292,12 +294,12 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
             _ => HitType::Unknown,
         };
 
-        let mut attacker = PlayerId::Player2;
+        let mut attacker = ObjectId::Player2;
         let mut attacker_state = new_state.state_p2.clone();
 
         // if projectile then store projectile data
         if last_hit_obj_p1 != player_2 {
-            attacker = PlayerId::Projectile;
+            attacker = ObjectId::Projectile;
             attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
                 last_hit_obj_p1.offset(0x2444),
             ));
@@ -305,6 +307,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             hit_type,
+            player_hit: ObjectId::Player1,
             attacker,
             attacker_state,
         }))
@@ -322,11 +325,11 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
             _ => HitType::Unknown,
         };
 
-        let mut attacker = PlayerId::Player1;
+        let mut attacker = ObjectId::Player1;
         let mut attacker_state = new_state.state_p1.clone();
 
         if last_hit_obj_p2 != player_1 {
-            attacker = PlayerId::Projectile;
+            attacker = ObjectId::Projectile;
             attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
                 last_hit_obj_p2.offset(0x2444),
             ));
@@ -334,17 +337,27 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             hit_type,
+            player_hit: ObjectId::Player2,
             attacker,
             attacker_state,
         }))
         .unwrap();
     }
 
-    if PREVIOUS_STATE != new_state && EVEN_FRAME {
+    // get config and check if we should update state depending on frameskip
+    let config = SAMMI_CONFIG.get().unwrap();
+
+    let should_send = if config.frame_skip > 0 {
+        FRAME_COUNTER % config.frame_skip == 0
+    } else {
+        true
+    };
+
+    if PREVIOUS_STATE != new_state && should_send {
         tx.blocking_send(SammiMessage::UpdateState(new_state.clone()))
             .unwrap();
     }
 
     PREVIOUS_STATE = new_state;
-    EVEN_FRAME = !EVEN_FRAME;
+    FRAME_COUNTER += 1;
 }
