@@ -266,8 +266,12 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
     let process_string =
         |arr: &[u8]| String::from(CStr::from_bytes_until_nul(&arr).unwrap().to_str().unwrap());
 
+    // current state
     new_state.player_1.state = process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
     new_state.player_2.state = process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
+
+    new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
+    new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
 
     // type of the last hit recieved
     let last_hit_type_p1 = helpers::read_type::<usize>(player_1.offset(0x990));
