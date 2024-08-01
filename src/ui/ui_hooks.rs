@@ -188,23 +188,13 @@ fn peek_message_w_hook(
 }
 
 fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
-    puffin::profile_function!();
     unsafe {
-        let profiled_endscene = |device| {
-            puffin::profile_scope!("EndScene");
-            let return_value = EndSceneHook.call(device);
-
-            puffin::GlobalProfiler::lock().new_frame();
-
-            return_value
-        };
-
         // trace!("endscene called");
         let mut state_lock = IMHOOK_STATE.lock();
         //trace!("acquired state lock");
         let state: &mut ImState = match *state_lock {
             Some(ref mut s) => s,
-            None => return profiled_endscene(device),
+            None => return EndSceneHook.call(device),
         };
 
         if state.renderer.is_none() {
@@ -212,7 +202,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     error!("Error creating new renderer: {:#X}", e);
-                    return profiled_endscene(device);
+                    return EndSceneHook.call(device);
                 }
             };
 
@@ -223,7 +213,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             let mut creation_params: D3DDEVICE_CREATION_PARAMETERS = mem::zeroed();
 
             if (*device).GetCreationParameters(&mut creation_params) != 0 {
-                return profiled_endscene(device);
+                return EndSceneHook.call(device);
             };
 
             let new_window = match Win32Impl::init(&mut state.im_ctx, creation_params.hFocusWindow)
@@ -231,7 +221,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
                 Ok(r) => r,
                 Err(e) => {
                     error!("Error creating new Win32Impl: {}", e);
-                    return profiled_endscene(device);
+                    return EndSceneHook.call(device);
                 }
             };
 
@@ -245,7 +235,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             error!("Error calling Win32Impl::prepare_frame: {}", e);
 
             state.window = None;
-            return profiled_endscene(device);
+            return EndSceneHook.call(device);
         }
 
         let ui = gui::ui_loop(state.im_ctx.frame());
@@ -255,14 +245,14 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             Some(r) => r,
             None => {
                 error!("no renderer in state");
-                return profiled_endscene(device);
+                return EndSceneHook.call(device);
             }
         };
         if let Err(e) = renderer.render(draw_data) {
             error!("could not render draw data: {}", e);
         };
 
-        profiled_endscene(device)
+        return EndSceneHook.call(device)
     }
 }
 

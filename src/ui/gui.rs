@@ -1,5 +1,4 @@
-use crate::global::GlobalMut;
-use crate::global::{self, MESSAGE_SENDER};
+use crate::global;
 use crate::sammi;
 
 use std::borrow::Cow;
@@ -8,7 +7,6 @@ use std::sync::atomic::Ordering;
 
 use imgui::*;
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use winapi::um::winuser::*;
 
@@ -16,8 +14,6 @@ use winapi::um::winuser::*;
 // before ever accessing DISPLAY_UI through the UI loop
 static DISPLAY_UI: Lazy<AtomicBool> =
     Lazy::new(|| AtomicBool::new(global::CONFIG.lock().display_ui_on_start));
-static PUFFIN_UI: GlobalMut<puffin_imgui::ProfilerUi> =
-    Lazy::new(|| Mutex::new(puffin_imgui::ProfilerUi::default()));
 static SELECTED_FOLDER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 
 fn save_config(config: global::ModConfig) {
@@ -110,16 +106,5 @@ pub fn ui_loop(ui: Ui) -> Ui {
             })
         });
 
-    Window::new("Game Info")
-        .size([200., 400.], Condition::Once)
-        .build(&ui, || {
-            TabBar::new("Runtime Info").build(&ui, || {
-                TabItem::new("Performance Monitor").build(&ui, || {
-                    let mut puffin_ui = PUFFIN_UI.lock();
-
-                    puffin_ui.ui(&ui);
-                });
-            });
-        });
     ui
 }

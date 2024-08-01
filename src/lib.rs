@@ -67,9 +67,6 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
 }
 
 unsafe fn initialize() {
-    puffin::set_scopes_on(true);
-
-    puffin::profile_function!();
     let config_path = PathBuf::from(global::CONFIG_PATH);
 
     let default_config = global::ModConfig::default();

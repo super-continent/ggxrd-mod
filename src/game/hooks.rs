@@ -44,7 +44,6 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     );
 
     ControlBattleObjectHook.initialize(control_battle_object_fn, |x| {
-        puffin::profile_scope!("CObjectManager::ControlBattleObject");
         ControlBattleObjectHook.call(x)
     })?;
     // .enable()?;
@@ -84,7 +83,6 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
 
     // TODO: figure out how to detect which character and script
     // is being loaded in a non-hacky way, should be a UE3 script function
-    puffin::profile_function!();
 
     debug!(
         "this: {:#X}, script_ptr: {:#X}, script_size: {:#X}",
@@ -192,10 +190,7 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
             }
         }
 
-        {
-            puffin::profile_scope!("BBSAnalyzeExe");
-            LoadBBScriptHook.call(this, script_ptr, script_size)
-        }
+        LoadBBScriptHook.call(this, script_ptr, script_size)
     }
 }
 
