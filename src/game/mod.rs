@@ -115,10 +115,9 @@ pub fn get_script_filename(script_file: ScriptFile, script_type: ScriptType) -> 
 fn get_script_file(script_file: ScriptFile, file_type: ScriptType) -> Option<Vec<u8>> {
     let mods_path = global::SELECTED_MOD_FOLDER.lock();
 
-    
     let file_name = get_script_filename(script_file, file_type);
     let script_path = mods_path.join(file_name);
-    
+
     let mut script = Vec::new();
     let result = File::open(&script_path).and_then(|mut file| file.read_to_end(&mut script));
 

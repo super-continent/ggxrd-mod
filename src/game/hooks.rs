@@ -62,7 +62,11 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 }
 
 unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
-    log::trace!("Got game_state {:X} and update_draw {}", game_state as usize, update_draw as u8);
+    log::trace!(
+        "Got game_state {:X} and update_draw {}",
+        game_state as usize,
+        update_draw as u8
+    );
     UpdateBattleHook.call(game_state, update_draw);
 
     #[cfg(feature = "sammi")]
@@ -71,7 +75,6 @@ unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
     if update_draw {
         crate::sammi::collect_info_sammi(game_state);
     }
-
 }
 
 // Hook for the fn that transfers script pointers.

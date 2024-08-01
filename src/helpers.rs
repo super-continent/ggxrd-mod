@@ -26,7 +26,7 @@ macro_rules! make_fn {
 }
 
 /// Follow some chain of offsets from a pointer to get a pointer to data.
-/// `[0x0, 0x10, 0x8]` will offset by `0x0`, dereference, offset by `0x10`, dereference, 
+/// `[0x0, 0x10, 0x8]` will offset by `0x0`, dereference, offset by `0x10`, dereference,
 /// then offset by `0x8`, dereference, and return the resulting pointer.
 pub unsafe fn pointer_chain(mut ptr: *mut u8, offsets: impl AsRef<[isize]>) -> *mut u8 {
     for offset in offsets.as_ref() {

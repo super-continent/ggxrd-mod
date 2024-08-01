@@ -8,11 +8,11 @@ use std::ffi::CString;
 use std::mem;
 use std::{error::Error, ptr};
 
-use retour::static_detour;
 use imgui_dx9_renderer::Renderer;
 use imgui_impl_win32_rs::*;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use retour::static_detour;
 use winapi::um::winuser::LPMSG;
 use winapi::{
     shared::{d3d9::*, d3d9types::*, minwindef::*, windef::HWND, winerror::FAILED},

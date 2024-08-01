@@ -274,10 +274,8 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         |arr: &[u8]| String::from(CStr::from_bytes_until_nul(&arr).unwrap().to_str().unwrap());
 
     // current state
-    new_state.player_1.state =
-        process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
-    new_state.player_2.state =
-        process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
+    new_state.player_1.state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
+    new_state.player_2.state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     // round wins
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
@@ -314,9 +312,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         // if projectile then store projectile data
         if last_hit_obj_p1 != player_2 && !last_hit_obj_p1.is_null() {
             attacker = ObjectId::Projectile;
-            attacker_state = process_string(&read_type::<[u8; 32]>(
-                last_hit_obj_p1.offset(0x2444),
-            ));
+            attacker_state = process_string(&read_type::<[u8; 32]>(last_hit_obj_p1.offset(0x2444)));
         }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
@@ -345,9 +341,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
         if last_hit_obj_p2 != player_1 && !last_hit_obj_p2.is_null() {
             attacker = ObjectId::Projectile;
-            attacker_state = process_string(&read_type::<[u8; 32]>(
-                last_hit_obj_p2.offset(0x2444),
-            ));
+            attacker_state = process_string(&read_type::<[u8; 32]>(last_hit_obj_p2.offset(0x2444)));
         }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {

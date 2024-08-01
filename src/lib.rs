@@ -48,7 +48,10 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
                 thread::spawn(|| unsafe { initialize() });
 
                 thread::spawn(move || {
-                    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap();
                     runtime.block_on(async move {
                         sammi::message_handler(rx).await;
                     });
