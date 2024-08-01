@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     global,
-    helpers::{self, Offset},
+    helpers::{self, read_type, Offset},
 };
 
 /// The config for sammi options, taken from the full serialized rev2mod config
@@ -152,6 +152,8 @@ impl PlayerState {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SammiState {
+    round_time_limit: usize,
+    round_time_left: usize,
     player_1: PlayerState,
     player_2: PlayerState,
 }
@@ -159,6 +161,8 @@ pub struct SammiState {
 impl SammiState {
     const fn new() -> Self {
         Self {
+            round_time_limit: 0,
+            round_time_left: 0,
             player_1: PlayerState::new(),
             player_2: PlayerState::new(),
         }
@@ -233,32 +237,37 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
     let player_2 = player_1.offset(P2_OFFSET);
     let mut new_state = SammiState::new();
 
+    let timer_state = *(Offset::new(0x198B6E4).get_address() as *mut *mut u8);
+
+    new_state.round_time_limit = read_type::<usize>(timer_state.offset(0x1C71FC));
+    new_state.round_time_left = read_type::<usize>(timer_state.offset(0x1C7200));
+
     new_state.player_1.character =
-        Character::from_number(helpers::read_type::<usize>(player_1.offset(0x44)));
+        Character::from_number(read_type::<usize>(player_1.offset(0x44)));
     new_state.player_2.character =
-        Character::from_number(helpers::read_type::<usize>(player_2.offset(0x44)));
+        Character::from_number(read_type::<usize>(player_2.offset(0x44)));
 
     // health
-    new_state.player_1.health = helpers::read_type::<isize>(player_1.offset(0x9CC));
-    new_state.player_2.health = helpers::read_type::<isize>(player_2.offset(0x9CC));
+    new_state.player_1.health = read_type::<isize>(player_1.offset(0x9CC));
+    new_state.player_2.health = read_type::<isize>(player_2.offset(0x9CC));
 
     // tension pulse
-    new_state.player_1.tension_pulse = helpers::read_type::<isize>(player_1.offset(0x2D128));
-    new_state.player_2.tension_pulse = helpers::read_type::<isize>(player_2.offset(0x2D128));
+    new_state.player_1.tension_pulse = read_type::<isize>(player_1.offset(0x2D128));
+    new_state.player_2.tension_pulse = read_type::<isize>(player_2.offset(0x2D128));
 
     // tension bar
-    new_state.player_1.tension = helpers::read_type::<isize>(player_1.offset(0x2D134));
-    new_state.player_2.tension = helpers::read_type::<isize>(player_2.offset(0x2D134));
+    new_state.player_1.tension = read_type::<isize>(player_1.offset(0x2D134));
+    new_state.player_2.tension = read_type::<isize>(player_2.offset(0x2D134));
 
     // burst
     let some_engine_static = Offset::new(0x198B6E4).get_address() as *mut *mut u8;
     let burst = (*some_engine_static).offset(0x1C4B20);
-    new_state.player_1.burst = helpers::read_type::<isize>(burst);
-    new_state.player_2.burst = helpers::read_type::<isize>(burst.offset(0x4));
+    new_state.player_1.burst = read_type::<isize>(burst);
+    new_state.player_2.burst = read_type::<isize>(burst.offset(0x4));
 
     // risc
-    new_state.player_1.risc = helpers::read_type::<isize>(player_1.offset(0x24E30));
-    new_state.player_2.risc = helpers::read_type::<isize>(player_2.offset(0x24E30));
+    new_state.player_1.risc = read_type::<isize>(player_1.offset(0x24E30));
+    new_state.player_2.risc = read_type::<isize>(player_2.offset(0x24E30));
 
     // turn string buf into String
     let process_string =
@@ -266,27 +275,27 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
     // current state
     new_state.player_1.state =
-        process_string(&helpers::read_type::<[u8; 32]>(player_1.offset(0x2444)));
+        process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
     new_state.player_2.state =
-        process_string(&helpers::read_type::<[u8; 32]>(player_2.offset(0x2444)));
+        process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     // round wins
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
     new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
 
     // type of the last hit recieved
-    let last_hit_type_p1 = helpers::read_type::<usize>(player_1.offset(0x990));
-    let last_hit_type_p2 = helpers::read_type::<usize>(player_2.offset(0x990));
+    let last_hit_type_p1 = read_type::<usize>(player_1.offset(0x990));
+    let last_hit_type_p2 = read_type::<usize>(player_2.offset(0x990));
 
     // pointer to the last object that hit the player
-    let last_hit_obj_p1 = helpers::read_type::<*mut u8>(player_1.offset(0x704));
-    let last_hit_obj_p2 = helpers::read_type::<*mut u8>(player_2.offset(0x704));
+    let last_hit_obj_p1 = read_type::<*mut u8>(player_1.offset(0x704));
+    let last_hit_obj_p2 = read_type::<*mut u8>(player_2.offset(0x704));
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
     // filter out hits which are actually chip damage
-    let is_blocking_p1 = (helpers::read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
-    let is_blocking_p2 = (helpers::read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
+    let is_blocking_p1 = (read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
+    let is_blocking_p2 = (read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
 
     if !is_blocking_p1
         && (last_hit_type_p1 != LAST_HIT_P1
@@ -305,7 +314,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         // if projectile then store projectile data
         if last_hit_obj_p1 != player_2 && !last_hit_obj_p1.is_null() {
             attacker = ObjectId::Projectile;
-            attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
+            attacker_state = process_string(&read_type::<[u8; 32]>(
                 last_hit_obj_p1.offset(0x2444),
             ));
         }
@@ -336,7 +345,7 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
         if last_hit_obj_p2 != player_1 && !last_hit_obj_p2.is_null() {
             attacker = ObjectId::Projectile;
-            attacker_state = process_string(&helpers::read_type::<[u8; 32]>(
+            attacker_state = process_string(&read_type::<[u8; 32]>(
                 last_hit_obj_p2.offset(0x2444),
             ));
         }
