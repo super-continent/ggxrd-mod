@@ -1,6 +1,7 @@
 use std::{ffi::CStr, sync::atomic::AtomicBool};
 
 use once_cell::sync::{Lazy, OnceCell};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,6 +20,7 @@ pub static SAMMI_ENABLED: AtomicBool = AtomicBool::new(true);
 pub enum SammiMessage {
     UpdateState(SammiState),
     PlayerHit(HitInfo),
+    RoundEnd(RoundEndInfo),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -123,10 +125,29 @@ pub enum HitType {
     Unknown,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RoundEndInfo {
+    winner: Winner,
+    cause: RoundEndCause,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum RoundEndCause {
+    Timeout,
+    Death,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum Winner {
+    Player1,
+    Player2,
+    Draw,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PlayerState {
     character: Character,
-    health: isize,
+    health: usize,
     tension_pulse: isize,
     tension: isize,
     burst: isize,
@@ -174,48 +195,44 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
     let config = SAMMI_CONFIG.get().unwrap();
     let agent = reqwest::Client::new();
 
+    let send_event = |agent: Client, event_name: String, custom_data: String| {
+        tokio::spawn(async move {
+            let start_time = std::time::Instant::now();
+            let res = agent
+                .post(&config.webhook_url)
+                .body(format!(
+                    "{{
+                        'trigger': '{event_name}',
+                        'eventInfo': {custom_data}
+                    }}"
+                ))
+                .send()
+                .await;
+            let duration = start_time.elapsed();
+            log::debug!("Request took: {:?}", duration);
+            log::debug!("{:?}", res);
+        })
+    };
+
     while let Some(message) = rx.recv().await {
         match message {
             SammiMessage::UpdateState(val) => {
                 let new_agent = agent.clone();
-                tokio::spawn(async move {
-                    let val = serde_json::ser::to_string(&val).unwrap();
-                    let start_time = std::time::Instant::now();
-                    let res = new_agent
-                        .post(&config.webhook_url)
-                        .timeout(std::time::Duration::from_millis(100))
-                        .body(format!(
-                            "{{
-                                'trigger': 'ggxrd_stateUpdate',
-                                'state': {val}
-                            }}",
-                        ))
-                        .send()
-                        .await;
-                    let duration = start_time.elapsed();
-                    log::debug!("Request took: {:?}", duration);
-                    log::debug!("{:?}", res);
-                })
+                let val = serde_json::ser::to_string(&val).unwrap();
+
+                send_event(new_agent, "ggxrd_stateUpdate".into(), val);
             }
             SammiMessage::PlayerHit(info) => {
                 let new_agent = agent.clone();
-                tokio::spawn(async move {
-                    let info = serde_json::ser::to_string(&info).unwrap();
-                    let start_time = std::time::Instant::now();
-                    let res = new_agent
-                        .post(&config.webhook_url)
-                        .body(format!(
-                            "{{
-                                'trigger': 'ggxrd_hitEvent',
-                                'eventInfo': {info}
-                            }}"
-                        ))
-                        .send()
-                        .await;
-                    let duration = start_time.elapsed();
-                    log::debug!("Request took: {:?}", duration);
-                    log::debug!("{:?}", res);
-                })
+                let info = serde_json::ser::to_string(&info).unwrap();
+
+                send_event(new_agent, "ggxrd_hitEvent".into(), info);
+            }
+            SammiMessage::RoundEnd(info) => {
+                let new_agent = agent.clone();
+                let info = serde_json::ser::to_string(&info).unwrap();
+
+                send_event(new_agent, "ggxrd_roundEndEvent".into(), info);
             }
         };
     }
@@ -248,8 +265,9 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         Character::from_number(read_type::<usize>(player_2.offset(0x44)));
 
     // health
-    new_state.player_1.health = read_type::<isize>(player_1.offset(0x9CC));
-    new_state.player_2.health = read_type::<isize>(player_2.offset(0x9CC));
+    // max with 0 and usize conversion ensures 0..MAX range
+    new_state.player_1.health = read_type::<isize>(player_1.offset(0x9CC)).max(0) as usize;
+    new_state.player_2.health = read_type::<isize>(player_2.offset(0x9CC)).max(0) as usize;
 
     // tension pulse
     new_state.player_1.tension_pulse = read_type::<isize>(player_1.offset(0x2D128));
@@ -351,6 +369,26 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
             attacker_state,
         }))
         .unwrap();
+    }
+
+    if new_state.round_time_left == 0
+        || new_state.player_1.health <= 0
+        || new_state.player_2.health <= 0
+    {
+        let winner = if new_state.player_1.health > new_state.player_2.health {
+            Winner::Player1
+        } else if new_state.player_1.health < new_state.player_2.health {
+            Winner::Player2
+        } else {
+            Winner::Draw
+        };
+
+        let cause = if new_state.round_time_left == 0 {
+            RoundEndCause::Timeout
+        } else {
+            RoundEndCause::Death
+        };
+        tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo { winner, cause }));
     }
 
     // get config and check if we should update state depending on frameskip
