@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     global,
-    helpers::{self, read_type, Offset},
+    helpers::{pointer_chain, read_type, Offset},
 };
 
 /// The config for sammi options, taken from the full serialized rev2mod config
@@ -20,6 +20,7 @@ pub static SAMMI_ENABLED: AtomicBool = AtomicBool::new(true);
 pub enum SammiMessage {
     UpdateState(SammiState),
     PlayerHit(HitInfo),
+    RoundStart,
     RoundEnd(RoundEndInfo),
 }
 
@@ -228,6 +229,12 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
 
                 send_event(new_agent, "ggxrd_hitEvent".into(), info);
             }
+            SammiMessage::RoundStart => {
+                let new_agent = agent.clone();
+
+                // no roundstart info
+                send_event(new_agent, "ggxrd_roundStartEvent".into(), "{}".into());
+            }
             SammiMessage::RoundEnd(info) => {
                 let new_agent = agent.clone();
                 let info = serde_json::ser::to_string(&info).unwrap();
@@ -238,19 +245,21 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
     }
 }
 
+static ROUND_OVER: AtomicBool = AtomicBool::new(true);
+
 static mut FRAME_COUNTER: usize = 0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
 static mut LAST_HIT_P1: usize = 0;
 static mut LAST_HIT_P2: usize = 0;
-pub unsafe fn collect_info_sammi(state: *mut u8) {
+pub unsafe fn game_loop_hook_sammi(state: *mut u8) {
     const P2_OFFSET: isize = 0x2D198;
 
     if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
     }
 
-    let player_1 = helpers::pointer_chain(state, [0x490, 0x484]);
+    let player_1 = pointer_chain(state, [0x490, 0x484]);
     let player_2 = player_1.offset(P2_OFFSET);
     let mut new_state = SammiState::new();
 
@@ -371,10 +380,14 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         .unwrap();
     }
 
-    if new_state.round_time_left == 0
-        || new_state.player_1.health <= 0
-        || new_state.player_2.health <= 0
+    // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
+    let round_over = ROUND_OVER.load(std::sync::atomic::Ordering::SeqCst);
+    if !round_over
+        && (new_state.round_time_left == 0
+            || new_state.player_1.health <= 0
+            || new_state.player_2.health <= 0)
     {
+        ROUND_OVER.store(true, std::sync::atomic::Ordering::SeqCst);
         let winner = if new_state.player_1.health > new_state.player_2.health {
             Winner::Player1
         } else if new_state.player_1.health < new_state.player_2.health {
@@ -388,7 +401,8 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
         } else {
             RoundEndCause::Death
         };
-        tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo { winner, cause }));
+        tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo { winner, cause }))
+            .unwrap();
     }
 
     // get config and check if we should update state depending on frameskip
@@ -407,4 +421,15 @@ pub unsafe fn collect_info_sammi(state: *mut u8) {
 
     PREVIOUS_STATE = new_state;
     FRAME_COUNTER += 1;
+}
+
+pub fn round_init_hook(use_2nd_initialize: bool) {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) || use_2nd_initialize {
+        return;
+    }
+
+    ROUND_OVER.store(false, std::sync::atomic::Ordering::Relaxed);
+    let tx = global::MESSAGE_SENDER.get().unwrap().clone();
+
+    tx.blocking_send(SammiMessage::RoundStart).unwrap();
 }

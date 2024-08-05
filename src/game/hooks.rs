@@ -17,6 +17,7 @@ static_detour! {
     static ControlBattleObjectHook: unsafe extern "thiscall" fn (*mut u8);
     static UpdateBattleHook: unsafe extern "thiscall" fn (*mut u8, bool);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
+    static BOMRoundAndEasyResetInitializeHook: unsafe extern "thiscall" fn (*mut u8, bool);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 
@@ -57,6 +58,21 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         .initialize(load_bbscript_fn, load_script_hook)?
         .enable()?;
 
+    let bom_init_fn = make_fn!(get_aob_offset(&offset::FN_BOM_ROUNDANDEASYRESETINITIALIZE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
+
+    log::debug!("bom_init: {}", bom_init_fn as usize);
+
+    BOMRoundAndEasyResetInitializeHook
+        .initialize(bom_init_fn, |battle_cobject_manager, use_2nd_initialize| {
+            log::trace!(
+                "BATTLE_CObjectManager: {:X}, use2ndInitialize: {}",
+                battle_cobject_manager as usize,
+                use_2nd_initialize
+            );
+            crate::sammi::round_init_hook(use_2nd_initialize);
+            BOMRoundAndEasyResetInitializeHook.call(battle_cobject_manager, use_2nd_initialize);
+        })?
+        .enable()?;
     Ok(())
 }
 
@@ -72,7 +88,7 @@ unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
     // only collect data on frames that are not rollback simulations
     // with 30fps limit
     if update_draw {
-        crate::sammi::collect_info_sammi(game_state);
+        crate::sammi::game_loop_hook_sammi(game_state);
     }
 }
 
