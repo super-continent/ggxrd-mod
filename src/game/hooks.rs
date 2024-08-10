@@ -2,7 +2,7 @@ use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::game::get_script_filename;
 use crate::global::GlobalMut;
 use crate::helpers::get_aob_offset;
-use crate::{global, make_fn};
+use crate::{global, make_fn, sammi};
 
 use std::ffi::CStr;
 use std::ptr;
@@ -17,8 +17,12 @@ static_detour! {
     static ControlBattleObjectHook: unsafe extern "thiscall" fn (*mut u8);
     static UpdateBattleHook: unsafe extern "thiscall" fn (*mut u8, bool);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
-    static BOMRoundAndEasyResetInitializeHook: unsafe extern "thiscall" fn (*mut u8, bool);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
+}
+#[cfg(feature = "sammi")]
+static_detour! {
+    static BOMRoundAndEasyResetInitializeHook: unsafe extern "thiscall" fn (*mut u8, bool);
+    static CreateObjectWithArgHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
 }
 
 static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
@@ -58,21 +62,40 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         .initialize(load_bbscript_fn, load_script_hook)?
         .enable()?;
 
-    let bom_init_fn = make_fn!(get_aob_offset(&offset::FN_BOM_ROUNDANDEASYRESETINITIALIZE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
+    #[cfg(feature = "sammi")]
+    {
+        let bom_init_fn = make_fn!(get_aob_offset(&offset::FN_BOM_ROUNDANDEASYRESETINITIALIZE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-    log::debug!("bom_init: {}", bom_init_fn as usize);
+        log::debug!("bom_init: {}", bom_init_fn as usize);
 
-    BOMRoundAndEasyResetInitializeHook
-        .initialize(bom_init_fn, |battle_cobject_manager, use_2nd_initialize| {
-            log::trace!(
-                "BATTLE_CObjectManager: {:X}, use2ndInitialize: {}",
-                battle_cobject_manager as usize,
-                use_2nd_initialize
-            );
-            crate::sammi::round_init_hook(use_2nd_initialize);
-            BOMRoundAndEasyResetInitializeHook.call(battle_cobject_manager, use_2nd_initialize);
-        })?
-        .enable()?;
+        BOMRoundAndEasyResetInitializeHook
+            .initialize(bom_init_fn, |battle_cobject_manager, use_2nd_initialize| {
+                log::trace!(
+                    "BATTLE_CObjectManager: {:X}, use2ndInitialize: {}",
+                    battle_cobject_manager as usize,
+                    use_2nd_initialize
+                );
+                crate::sammi::round_init_hook(use_2nd_initialize);
+                BOMRoundAndEasyResetInitializeHook.call(battle_cobject_manager, use_2nd_initialize);
+            })?
+            .enable()?;
+
+        let create_object_fn = make_fn!(get_aob_offset(&offset::FN_CREATE_OBJECT_WITH_ARG).unwrap() => unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8));
+
+        log::debug!("create_object_with_arg: {}", create_object_fn as usize);
+        CreateObjectWithArgHook
+            .initialize(create_object_fn, |object, arg, ptr| {
+                log::trace!(
+                    "CreateObjectWithArg: {:X}, {:X}, {:X}",
+                    object as usize,
+                    arg as usize,
+                    ptr as usize
+                );
+                sammi::create_object_with_arg_hook(object, arg, ptr);
+                CreateObjectWithArgHook.call(object, arg, ptr);
+            })?
+            .enable()?;
+    }
     Ok(())
 }
 

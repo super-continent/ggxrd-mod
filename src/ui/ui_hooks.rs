@@ -252,7 +252,7 @@ fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
             error!("could not render draw data: {}", e);
         };
 
-        return EndSceneHook.call(device)
+        return EndSceneHook.call(device);
     }
 }
 

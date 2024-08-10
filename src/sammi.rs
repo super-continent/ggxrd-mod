@@ -20,6 +20,7 @@ pub static SAMMI_ENABLED: AtomicBool = AtomicBool::new(true);
 pub enum SammiMessage {
     UpdateState(SammiState),
     PlayerHit(HitInfo),
+    ObjectCreated(String),
     RoundStart,
     RoundEnd(RoundEndInfo),
 }
@@ -229,6 +230,12 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
 
                 send_event(new_agent, "ggxrd_hitEvent".into(), info);
             }
+            SammiMessage::ObjectCreated(name) => {
+                let new_agent = agent.clone();
+                let info = serde_json::ser::to_string(&name).unwrap();
+
+                send_event(new_agent, "ggxrd_objectCreatedEvent".into(), info);
+            }
             SammiMessage::RoundStart => {
                 let new_agent = agent.clone();
 
@@ -243,6 +250,11 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
             }
         };
     }
+}
+
+// turn string buf into String
+fn process_string(arr: &[u8]) -> String {
+    String::from(CStr::from_bytes_until_nul(arr).unwrap().to_str().unwrap())
 }
 
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
@@ -295,10 +307,6 @@ pub unsafe fn game_loop_hook_sammi(state: *mut u8) {
     // risc
     new_state.player_1.risc = read_type::<isize>(player_1.offset(0x24E30));
     new_state.player_2.risc = read_type::<isize>(player_2.offset(0x24E30));
-
-    // turn string buf into String
-    let process_string =
-        |arr: &[u8]| String::from(CStr::from_bytes_until_nul(&arr).unwrap().to_str().unwrap());
 
     // current state
     new_state.player_1.state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
@@ -432,4 +440,17 @@ pub fn round_init_hook(use_2nd_initialize: bool) {
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
     tx.blocking_send(SammiMessage::RoundStart).unwrap();
+}
+
+pub unsafe fn create_object_with_arg_hook(_object: *mut u8, arg: *mut u8, _ptr: *mut u8) {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+
+    let object_name = process_string(&read_type::<[u8; 32]>(arg));
+
+    let tx = global::MESSAGE_SENDER.get().unwrap().clone();
+
+    tx.blocking_send(SammiMessage::ObjectCreated(object_name))
+        .unwrap();
 }
