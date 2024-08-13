@@ -109,7 +109,6 @@ unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
 
     #[cfg(feature = "sammi")]
     // only collect data on frames that are not rollback simulations
-    // with 30fps limit
     if update_draw {
         crate::sammi::game_loop_hook_sammi(game_state);
     }

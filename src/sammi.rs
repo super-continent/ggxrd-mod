@@ -422,7 +422,7 @@ pub unsafe fn game_loop_hook_sammi(state: *mut u8) {
         true
     };
 
-    if PREVIOUS_STATE != new_state && should_send {
+    if should_send {
         tx.blocking_send(SammiMessage::UpdateState(new_state.clone()))
             .unwrap();
     }
