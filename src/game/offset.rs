@@ -3,8 +3,10 @@ use once_cell::sync::Lazy;
 ///! Offsets and AOB scan patterns to locate certain function in Xrd
 use sigscan::SigScan;
 
+use crate::helpers::Offset;
+
 /// BattleState::ControlBattleObject(state *)
-pub static FN_CONTROL_BATTLE_OBJECT: Lazy<SigScan> = Lazy::new(|| {
+pub const FN_CONTROL_BATTLE_OBJECT: Lazy<SigScan> = Lazy::new(|| {
     SigScan::new_yara_style(concat!(
         "6a ff 68 ?? ?? ?? ?? 64 a1 ?? ?? ?? ?? 5? 81",
         "e? ?? ?? ?? ?? a1 ?? ?? ?? ?? 33 ?? 89 ?? ?? ??",
@@ -63,3 +65,10 @@ pub const FN_CREATE_OBJECT_WITH_ARG: Lazy<SigScan> = Lazy::new(|| {
         "?? ?? ?? 8b ??"
     ))
 });
+
+pub const GAMESTATE_PTR: Offset = Offset::new(0x198B6E4);
+
+/// `[GAMESTATE_PTR]` offset to player 1
+pub const P1_OFFSET: isize = 0x169814;
+/// `[GAMESTATE_PTR]` offset to player 2
+pub const P2_OFFSET: isize = 0x169814 + 0x2D198;

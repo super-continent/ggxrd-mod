@@ -5,8 +5,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    global,
-    helpers::{pointer_chain, read_type, Offset},
+    game, global,
+    helpers::{read_type, Offset},
 };
 
 /// The config for sammi options, taken from the full serialized rev2mod config
@@ -20,7 +20,7 @@ pub static SAMMI_ENABLED: AtomicBool = AtomicBool::new(true);
 pub enum SammiMessage {
     UpdateState(SammiState),
     PlayerHit(HitInfo),
-    ObjectCreated(String),
+    ObjectCreated(ObjectCreatedInfo),
     RoundStart,
     RoundEnd(RoundEndInfo),
 }
@@ -146,6 +146,14 @@ pub enum Winner {
     Draw,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ObjectCreatedInfo {
+    object_name: String,
+    created_by: ObjectId,
+    player1_state: String,
+    player2_state: String,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PlayerState {
     character: Character,
@@ -264,21 +272,19 @@ static mut FRAME_COUNTER: usize = 0;
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
 static mut LAST_HIT_P1: usize = 0;
 static mut LAST_HIT_P2: usize = 0;
-pub unsafe fn game_loop_hook_sammi(state: *mut u8) {
-    const P2_OFFSET: isize = 0x2D198;
-
+pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
     }
 
-    let player_1 = pointer_chain(state, [0x490, 0x484]);
-    let player_2 = player_1.offset(P2_OFFSET);
+    let gamestate = *(game::offset::GAMESTATE_PTR.get_address() as *mut *mut u8);
+
+    let player_1 = gamestate.offset(game::offset::P1_OFFSET);
+    let player_2 = gamestate.offset(game::offset::P2_OFFSET);
     let mut new_state = SammiState::new();
 
-    let timer_state = *(Offset::new(0x198B6E4).get_address() as *mut *mut u8);
-
-    new_state.round_time_limit = read_type::<usize>(timer_state.offset(0x1C71FC));
-    new_state.round_time_left = read_type::<usize>(timer_state.offset(0x1C7200));
+    new_state.round_time_limit = read_type::<usize>(gamestate.offset(0x1C71FC));
+    new_state.round_time_left = read_type::<usize>(gamestate.offset(0x1C7200));
 
     new_state.player_1.character =
         Character::from_number(read_type::<usize>(player_1.offset(0x44)));
@@ -442,15 +448,38 @@ pub fn round_init_hook(use_2nd_initialize: bool) {
     tx.blocking_send(SammiMessage::RoundStart).unwrap();
 }
 
-pub unsafe fn create_object_with_arg_hook(_object: *mut u8, arg: *mut u8, _ptr: *mut u8) {
+pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *mut u8) {
     if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
     }
 
+    let gamestate = *(game::offset::GAMESTATE_PTR.get_address() as *mut *mut u8);
+
+    let player_1 = gamestate.offset(game::offset::P1_OFFSET);
+    let player_2 = gamestate.offset(game::offset::P2_OFFSET);
+
+    let created_by = if object == player_1 {
+        ObjectId::Player1
+    } else if object == player_2 {
+        ObjectId::Player2
+    } else {
+        ObjectId::Projectile
+    };
+
     let object_name = process_string(&read_type::<[u8; 32]>(arg));
+
+    let player1_state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
+    let player2_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
+
+    let object_created_info = ObjectCreatedInfo {
+        created_by,
+        player1_state,
+        player2_state,
+        object_name,
+    };
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
-    tx.blocking_send(SammiMessage::ObjectCreated(object_name))
+    tx.blocking_send(SammiMessage::ObjectCreated(object_created_info))
         .unwrap();
 }
