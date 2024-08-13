@@ -147,7 +147,7 @@ pub enum Winner {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct ObjectCreatedInfo {
+pub struct ObjectCreatedInfo {
     object_name: String,
     created_by: ObjectId,
     player1_state: String,
