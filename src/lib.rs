@@ -67,38 +67,6 @@ pub extern "stdcall" fn DllMain(hinst_dll: HINSTANCE, attach_reason: DWORD, _: c
 }
 
 unsafe fn initialize() {
-    let config_path = PathBuf::from(global::CONFIG_PATH);
-
-    let default_config = global::ModConfig::default();
-    let default_config_str = toml::to_string_pretty(&default_config).unwrap();
-
-    if !config_path.is_file() {
-        match File::create(config_path) {
-            Ok(mut f) => f.write_all(default_config_str.as_bytes()).unwrap(),
-            Err(e) => error!("{}", e),
-        };
-    } else {
-        match File::open(&config_path) {
-            Ok(mut f) => {
-                let mut config = String::new();
-                f.read_to_string(&mut config).unwrap();
-
-                let new_config = toml::from_str::<global::ModConfig>(&config).unwrap_or_else(|e| {
-                    error!("error loading config: {}, writing default...", e);
-                    match File::create(&config_path) {
-                        Ok(mut f) => f.write_all(default_config_str.as_bytes()).unwrap(),
-                        Err(e) => error!("{}", e),
-                    };
-                    default_config
-                });
-
-                let mut config_lock = global::CONFIG.lock();
-                *config_lock = new_config;
-            }
-            Err(e) => error!("{}", e),
-        };
-    }
-
     let log_level = global::CONFIG.lock().log_level;
     // let log_level = LevelFilter::Trace;
     if let Ok(logfile) = File::create("rev2mod.log") {
