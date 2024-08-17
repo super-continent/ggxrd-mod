@@ -422,11 +422,13 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     // get config and check if we should update state depending on frameskip
     let config = SAMMI_CONFIG.get().unwrap();
 
-    let should_send = if config.frame_skip > 0 {
+    let should_send = if config.frame_skip > 1 {
         FRAME_COUNTER % config.frame_skip == 0
     } else {
         true
     };
+
+    log::trace!("sending at frame {}: {}", FRAME_COUNTER, should_send);
 
     if should_send {
         tx.blocking_send(SammiMessage::UpdateState(new_state.clone()))
