@@ -220,7 +220,7 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
                 .await;
             let duration = start_time.elapsed();
             log::debug!("Request took: {:?}", duration);
-            log::debug!("{:?}", res);
+            log::debug!("Response to {}: {:?}", event_name, res);
         })
     };
 
