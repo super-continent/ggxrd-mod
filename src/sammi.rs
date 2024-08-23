@@ -1,4 +1,4 @@
-use std::{ffi::CStr, sync::atomic::AtomicBool};
+use std::{ffi::CStr, sync::atomic::AtomicBool, time::Duration};
 
 use once_cell::sync::{Lazy, OnceCell};
 use reqwest::Client;
@@ -30,6 +30,7 @@ pub struct SammiConfig {
     pub sammi_enabled: bool,
     pub webhook_url: String,
     pub frame_skip: usize,
+    pub timeout: f32,
 }
 
 impl Default for SammiConfig {
@@ -38,6 +39,7 @@ impl Default for SammiConfig {
             sammi_enabled: true,
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
             frame_skip: 2,
+            timeout: 0.1,
         }
     }
 }
@@ -205,11 +207,12 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
     let config = SAMMI_CONFIG.get().unwrap();
     let agent = reqwest::Client::new();
 
-    let send_event = |agent: Client, event_name: String, custom_data: String| {
+    let send_event = |agent: Client, event_name: String, custom_data: String, timeout: f32| {
         tokio::spawn(async move {
             let start_time = std::time::Instant::now();
             let res = agent
                 .post(&config.webhook_url)
+                .timeout(Duration::from_secs_f32(timeout))
                 .body(format!(
                     "{{
                         'trigger': '{event_name}',
@@ -230,31 +233,57 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
                 let new_agent = agent.clone();
                 let val = serde_json::ser::to_string(&val).unwrap();
 
-                send_event(new_agent, "ggxrd_stateUpdate".into(), val);
+                send_event(
+                    new_agent,
+                    "ggxrd_stateUpdate".into(),
+                    val,
+                    // timeout multiplied by 2 for other cases to ensure state updates timeout first
+                    config.timeout.abs(),
+                );
             }
             SammiMessage::PlayerHit(info) => {
                 let new_agent = agent.clone();
                 let info = serde_json::ser::to_string(&info).unwrap();
 
-                send_event(new_agent, "ggxrd_hitEvent".into(), info);
+                send_event(
+                    new_agent,
+                    "ggxrd_hitEvent".into(),
+                    info,
+                    config.timeout.abs() * 2.0,
+                );
             }
             SammiMessage::ObjectCreated(name) => {
                 let new_agent = agent.clone();
                 let info = serde_json::ser::to_string(&name).unwrap();
 
-                send_event(new_agent, "ggxrd_objectCreatedEvent".into(), info);
+                send_event(
+                    new_agent,
+                    "ggxrd_objectCreatedEvent".into(),
+                    info,
+                    config.timeout.abs() * 2.0,
+                );
             }
             SammiMessage::RoundStart => {
                 let new_agent = agent.clone();
 
                 // no roundstart info
-                send_event(new_agent, "ggxrd_roundStartEvent".into(), "{}".into());
+                send_event(
+                    new_agent,
+                    "ggxrd_roundStartEvent".into(),
+                    "{}".into(),
+                    config.timeout.abs() * 2.0,
+                );
             }
             SammiMessage::RoundEnd(info) => {
                 let new_agent = agent.clone();
                 let info = serde_json::ser::to_string(&info).unwrap();
 
-                send_event(new_agent, "ggxrd_roundEndEvent".into(), info);
+                send_event(
+                    new_agent,
+                    "ggxrd_roundEndEvent".into(),
+                    info,
+                    config.timeout.abs() * 2.0,
+                );
             }
         };
     }
