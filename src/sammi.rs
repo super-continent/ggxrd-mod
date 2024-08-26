@@ -38,7 +38,7 @@ impl Default for SammiConfig {
         Self {
             sammi_enabled: true,
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
-            state_update_hz: 30.0,
+            state_update_hz: 25.0,
             timeout: 0.1,
         }
     }
