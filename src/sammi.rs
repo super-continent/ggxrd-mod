@@ -450,16 +450,14 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 
     // get config and check if we should update state depending on frameskip
     let config = SAMMI_CONFIG.get().unwrap();
-    let update_hz = config.state_update_hz.clamp(1.0, 60.0);
+    let update_t = 1.0/config.state_update_hz.clamp(1.0, 60.0);
 
-    let should_send = if FRAME_ACCUMULATOR > update_hz {
-        FRAME_ACCUMULATOR -= update_hz;
+    let should_send = if FRAME_ACCUMULATOR > update_t {
+        FRAME_ACCUMULATOR -= update_t;
         true
     } else {
         false
     };
-
-    log::trace!("sending at frame {}: {}", FRAME_ACCUMULATOR, should_send);
 
     if should_send {
         tx.blocking_send(SammiMessage::UpdateState(new_state.clone()))
@@ -467,7 +465,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     }
 
     PREVIOUS_STATE = new_state;
-    FRAME_ACCUMULATOR += 1.0;
+    FRAME_ACCUMULATOR += 1.0/60.0;
 }
 
 pub fn round_init_hook(use_2nd_initialize: bool) {
