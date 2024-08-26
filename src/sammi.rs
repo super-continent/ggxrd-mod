@@ -29,7 +29,7 @@ pub enum SammiMessage {
 pub struct SammiConfig {
     pub sammi_enabled: bool,
     pub webhook_url: String,
-    pub frame_skip: usize,
+    pub state_update_hz: f32,
     pub timeout: f32,
 }
 
@@ -38,7 +38,7 @@ impl Default for SammiConfig {
         Self {
             sammi_enabled: true,
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
-            frame_skip: 2,
+            state_update_hz: 30.0,
             timeout: 0.1,
         }
     }
@@ -296,7 +296,7 @@ fn process_string(arr: &[u8]) -> String {
 
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
-static mut FRAME_COUNTER: usize = 0;
+static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
 static mut LAST_HIT_P1: usize = 0;
@@ -450,14 +450,16 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 
     // get config and check if we should update state depending on frameskip
     let config = SAMMI_CONFIG.get().unwrap();
+    let update_hz = config.state_update_hz.clamp(1.0, 60.0);
 
-    let should_send = if config.frame_skip > 1 {
-        FRAME_COUNTER % config.frame_skip == 0
-    } else {
+    let should_send = if FRAME_ACCUMULATOR > update_hz {
+        FRAME_ACCUMULATOR -= update_hz;
         true
+    } else {
+        false
     };
 
-    log::trace!("sending at frame {}: {}", FRAME_COUNTER, should_send);
+    log::trace!("sending at frame {}: {}", FRAME_ACCUMULATOR, should_send);
 
     if should_send {
         tx.blocking_send(SammiMessage::UpdateState(new_state.clone()))
@@ -465,7 +467,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     }
 
     PREVIOUS_STATE = new_state;
-    FRAME_COUNTER += 1;
+    FRAME_ACCUMULATOR += 1.0;
 }
 
 pub fn round_init_hook(use_2nd_initialize: bool) {
