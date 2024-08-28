@@ -38,8 +38,8 @@ Basic types:
 Sometimes a type is an enumeration of possible values, represented as different strings.
 The enum types are:
 
-*Character*: The character a player is using
-```c
+**Character**: The character a player is using
+```js
 'Sol'
 'Ky'
 'May'
@@ -67,29 +67,29 @@ The enum types are:
 'Answer'
 ```
 
-*HitType*: The type of hit a player recieved
-```
+**HitType**: The type of hit a player recieved
+```js
 'Normal'
 'Counter'
 'MortalCounter'
 ```
 
 *ObjectId*: An object in game being referenced
-```c
+```js
 'Player1'
 'Player2'
 'Projectile'
 ```
 
-*Winner*: The winner of a round
-```c
+**Winner**: The winner of a round
+```js
 'Player1'
 'Player2'
 'Draw'
 ```
 
-*RoundEndCause*: What caused a round to end
-```c
+**RoundEndCause**: What caused a round to end
+```js
 'Timeout'
 'Death'
 ```
