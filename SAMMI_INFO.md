@@ -25,7 +25,7 @@ timeout = 0.1
 
 ## SAMMI Mod Event Data
 
-Each event webhook request contains an `eventInfo` field inside the `data` field, this `eventInfo` contains all information relevant to the specific event. These are the structures of each event.
+Each event webhook request contains a `data` field, inside the `data` field, there is an `eventInfo` field containing all information relevant to the specific event. This section lists the structures of each `eventInfo` field, with respect the event being recieved.
 
 ## Data Types:
 Fields will have a type assigned to them, describing what kind of data is being sent
@@ -38,8 +38,8 @@ Basic types:
 Sometimes a type is an enumeration of possible values, represented as different strings.
 The enum types are:
 
-*Character*: The character a player is using
-```c
+**Character**: The character a player is using
+```js
 'Sol'
 'Ky'
 'May'
@@ -67,29 +67,29 @@ The enum types are:
 'Answer'
 ```
 
-*HitType*: The type of hit a player recieved
-```
+**HitType**: The type of hit a player recieved
+```js
 'Normal'
 'Counter'
 'MortalCounter'
 ```
 
 *ObjectId*: An object in game being referenced
-```c
+```js
 'Player1'
 'Player2'
 'Projectile'
 ```
 
-*Winner*: The winner of a round
-```c
+**Winner**: The winner of a round
+```js
 'Player1'
 'Player2'
 'Draw'
 ```
 
-*RoundEndCause*: What caused a round to end
-```c
+**RoundEndCause**: What caused a round to end
+```js
 'Timeout'
 'Death'
 ```

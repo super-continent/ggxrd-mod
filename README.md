@@ -7,7 +7,7 @@ Put the `dinput8.dll` inside your `<Steam Install Path>/Guilty Gear Xrd -REVELAT
 # SAMMI Integration
 This mod has support for integration with [SAMMI](https://sammi.solutions/), a streaming assistant that allows you to modify things like OBS layouts dynamically based on custom logic. For information on integrating your stream with Xrd, visit [the documentation](SAMMI_INFO.md), follow the linked guides, and read the information on what data is sent.
 
-The way it works is that when this mod is compiled with the `sammi` feature enabled (as it should be in the releases), the mod will send webhook triggers to the webhook URL specified in the `rev2mod_config.ini` inside your Xrd installation folder.
+Note: can be disabled by compiling without the `sammi` feature.
 
 # Building
 Clone the project with git or download a ZIP archive of the source, [install Rust](https://rustup.rs/), make sure you have the `i686-pc-windows-msvc` target by running `rustup target add i686-pc-windows-msvc` in your command line, and then run `cargo build` for a debug (unoptimized) version or `cargo build --release` for a release build, in the `target` folder you will find the built DLL, you can rename it to `dinput8.dll` and follow the instructions in the [Installing](#installing) section above
