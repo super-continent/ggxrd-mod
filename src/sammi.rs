@@ -392,6 +392,8 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attacker_state,
         }))
         .unwrap();
+
+        LAST_HIT_P1 = last_hit_type_p1;
     }
 
     // do it again for p2
@@ -421,6 +423,8 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attacker_state,
         }))
         .unwrap();
+    
+        LAST_HIT_P2 = last_hit_type_p2;
     }
 
     // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
