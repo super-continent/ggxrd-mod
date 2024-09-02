@@ -5,7 +5,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    game, global,
+    game::offset::*,
+    global,
     helpers::{read_type, Offset},
 };
 
@@ -185,6 +186,8 @@ impl PlayerState {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SammiState {
+    current_frame: usize,
+    rounds_to_win: usize,
     round_time_limit: usize,
     round_time_left: usize,
     player_1: PlayerState,
@@ -194,6 +197,8 @@ pub struct SammiState {
 impl SammiState {
     const fn new() -> Self {
         Self {
+            current_frame: 0,
+            rounds_to_win: 2,
             round_time_limit: 0,
             round_time_left: 0,
             player_1: PlayerState::new(),
@@ -306,14 +311,21 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
         return;
     }
 
-    let gamestate = *(game::offset::GAMESTATE_PTR.get_address() as *mut *mut u8);
+    let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
-    let player_1 = gamestate.offset(game::offset::P1_OFFSET);
-    let player_2 = gamestate.offset(game::offset::P2_OFFSET);
     let mut new_state = SammiState::new();
+    
+    // get game state
+    new_state.current_frame = read_type::<usize>(gamestate.offset(CURRENT_FRAME));
+    
+    new_state.rounds_to_win = read_type::<usize>(gamestate.offset(ROUNDS_TO_WIN));
 
-    new_state.round_time_limit = read_type::<usize>(gamestate.offset(0x1C71FC));
-    new_state.round_time_left = read_type::<usize>(gamestate.offset(0x1C7200));
+    new_state.round_time_limit = read_type::<usize>(gamestate.offset(ROUND_TIME_LIMIT));
+    new_state.round_time_left = read_type::<usize>(gamestate.offset(ROUND_TIME_LEFT));
+
+    // get player state
+    let player_1 = gamestate.offset(P1_OFFSET);
+    let player_2 = gamestate.offset(P2_OFFSET);
 
     new_state.player_1.character =
         Character::from_number(read_type::<usize>(player_1.offset(0x44)));
@@ -334,10 +346,8 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_2.tension = read_type::<isize>(player_2.offset(0x2D134));
 
     // burst
-    let some_engine_static = Offset::new(0x198B6E4).get_address() as *mut *mut u8;
-    let burst = (*some_engine_static).offset(0x1C4B20);
-    new_state.player_1.burst = read_type::<isize>(burst);
-    new_state.player_2.burst = read_type::<isize>(burst.offset(0x4));
+    new_state.player_1.burst = read_type::<isize>(gamestate.offset(BURST_P1));
+    new_state.player_2.burst = read_type::<isize>(gamestate.offset(BURST_P2));
 
     // risc
     new_state.player_1.risc = read_type::<isize>(player_1.offset(0x24E30));
@@ -423,7 +433,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attacker_state,
         }))
         .unwrap();
-    
+
         LAST_HIT_P2 = last_hit_type_p2;
     }
 
@@ -454,7 +464,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 
     // get config and check if we should update state depending on frameskip
     let config = SAMMI_CONFIG.get().unwrap();
-    let update_t = 1.0/config.state_update_hz.clamp(1.0, 60.0);
+    let update_t = 1.0 / config.state_update_hz.clamp(1.0, 60.0);
 
     let should_send = if FRAME_ACCUMULATOR > update_t {
         FRAME_ACCUMULATOR -= update_t;
@@ -469,7 +479,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     }
 
     PREVIOUS_STATE = new_state;
-    FRAME_ACCUMULATOR += 1.0/60.0;
+    FRAME_ACCUMULATOR += 1.0 / 60.0;
 }
 
 pub fn round_init_hook(use_2nd_initialize: bool) {
@@ -488,10 +498,10 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
         return;
     }
 
-    let gamestate = *(game::offset::GAMESTATE_PTR.get_address() as *mut *mut u8);
+    let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
-    let player_1 = gamestate.offset(game::offset::P1_OFFSET);
-    let player_2 = gamestate.offset(game::offset::P2_OFFSET);
+    let player_1 = gamestate.offset(P1_OFFSET);
+    let player_2 = gamestate.offset(P2_OFFSET);
 
     let created_by = if object == player_1 {
         ObjectId::Player1
