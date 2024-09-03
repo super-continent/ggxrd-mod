@@ -116,6 +116,7 @@ impl Character {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HitInfo {
+    current_frame: usize,
     hit_type: HitType,
     player_hit: ObjectId,
     attacker: ObjectId,
@@ -132,6 +133,7 @@ pub enum HitType {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RoundEndInfo {
+    current_frame: usize,
     winner: Winner,
     cause: RoundEndCause,
 }
@@ -151,6 +153,7 @@ pub enum Winner {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ObjectCreatedInfo {
+    current_frame: usize,
     object_name: String,
     created_by: ObjectId,
     player1_state: String,
@@ -314,10 +317,10 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
     let mut new_state = SammiState::new();
-    
+
     // get game state
     new_state.current_frame = read_type::<usize>(gamestate.offset(CURRENT_FRAME));
-    
+
     new_state.rounds_to_win = read_type::<usize>(gamestate.offset(ROUNDS_TO_WIN));
 
     new_state.round_time_limit = read_type::<usize>(gamestate.offset(ROUND_TIME_LIMIT));
@@ -396,6 +399,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
         }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
+            current_frame: new_state.current_frame,
             hit_type,
             player_hit: ObjectId::Player1,
             attacker,
@@ -427,6 +431,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
         }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
+            current_frame: new_state.current_frame,
             hit_type,
             player_hit: ObjectId::Player2,
             attacker,
@@ -458,8 +463,12 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
         } else {
             RoundEndCause::Death
         };
-        tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo { winner, cause }))
-            .unwrap();
+        tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo {
+            current_frame: new_state.current_frame,
+            winner,
+            cause,
+        }))
+        .unwrap();
     }
 
     // get config and check if we should update state depending on frameskip
@@ -500,6 +509,8 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
+    let current_frame = read_type::<usize>(gamestate.offset(CURRENT_FRAME));
+
     let player_1 = gamestate.offset(P1_OFFSET);
     let player_2 = gamestate.offset(P2_OFFSET);
 
@@ -517,6 +528,7 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
     let player2_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     let object_created_info = ObjectCreatedInfo {
+        current_frame,
         created_by,
         player1_state,
         player2_state,
