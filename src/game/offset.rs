@@ -68,9 +68,6 @@ pub const FN_CREATE_OBJECT_WITH_ARG: Lazy<SigScan> = Lazy::new(|| {
 
 pub const GAMESTATE_PTR: Offset = Offset::new(0x198B6E4);
 
-/// `[GAMESTATE_PTR]` offset to frame counter
-pub const CURRENT_FRAME: isize = 0x47C;
-
 pub const ROUNDS_TO_WIN: isize = 0x1C7240;
 
 pub const ROUND_TIME_LIMIT: isize = 0x1C71FC;
