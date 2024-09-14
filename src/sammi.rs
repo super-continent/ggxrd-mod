@@ -1,4 +1,4 @@
-use std::{ffi::CStr, sync::atomic::AtomicBool, time::Duration};
+use std::{ffi::CStr, sync::atomic::{AtomicBool, Ordering}, time::Duration};
 
 use once_cell::sync::{Lazy, OnceCell};
 use reqwest::Client;
@@ -495,14 +495,14 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     FRAME_ACCUMULATOR += 1.0 / 60.0;
 }
 
-pub unsafe fn round_init_hook(use_2nd_initialize: bool) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) || use_2nd_initialize {
+pub unsafe fn round_init_hook(_use_2nd_initialize: bool) {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) || !ROUND_OVER.load(Ordering::Relaxed) {
         return;
     }
 
     CURRENT_FRAME = 0;
 
-    ROUND_OVER.store(false, std::sync::atomic::Ordering::Relaxed);
+    ROUND_OVER.store(false, Ordering::Relaxed);
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
     tx.blocking_send(SammiMessage::RoundStart).unwrap();
