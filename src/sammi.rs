@@ -119,6 +119,7 @@ pub struct HitInfo {
     current_frame: usize,
     hit_type: HitType,
     player_hit: ObjectId,
+    attack_level: u32,
     attacker: ObjectId,
     attacker_state: String,
 }
@@ -395,17 +396,20 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 
         let mut attacker = ObjectId::Player2;
         let mut attacker_state = new_state.player_2.state.clone();
+        let mut attack_lvl = read_type::<u32>(player_2.offset(0x450));
 
         // if projectile then store projectile data
         if last_hit_obj_p1 != player_2 && !last_hit_obj_p1.is_null() {
             attacker = ObjectId::Projectile;
             attacker_state = process_string(&read_type::<[u8; 32]>(last_hit_obj_p1.offset(0x2444)));
+            attack_lvl = read_type::<u32>(last_hit_obj_p1.offset(0x450));
         }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             current_frame: CURRENT_FRAME,
             hit_type,
             player_hit: ObjectId::Player1,
+            attack_level: attack_lvl,
             attacker,
             attacker_state,
         }))
@@ -428,16 +432,19 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 
         let mut attacker = ObjectId::Player1;
         let mut attacker_state = new_state.player_1.state.clone();
+        let mut attack_lvl = read_type::<u32>(player_1.offset(0x450));
 
         if last_hit_obj_p2 != player_1 && !last_hit_obj_p2.is_null() {
             attacker = ObjectId::Projectile;
             attacker_state = process_string(&read_type::<[u8; 32]>(last_hit_obj_p2.offset(0x2444)));
+            attack_lvl = read_type::<u32>(last_hit_obj_p2.offset(0x450));
         }
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             current_frame: CURRENT_FRAME,
             hit_type,
             player_hit: ObjectId::Player2,
+            attack_level: attack_lvl,
             attacker,
             attacker_state,
         }))
