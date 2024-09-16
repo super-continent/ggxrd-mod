@@ -165,6 +165,7 @@ pub struct ObjectCreatedInfo {
 pub struct PlayerState {
     character: Character,
     health: usize,
+    untechable_time: usize,
     tension_pulse: isize,
     tension: isize,
     burst: isize,
@@ -178,6 +179,7 @@ impl PlayerState {
         Self {
             character: Character::Sol,
             health: 420,
+            untechable_time: 0,
             tension_pulse: 0,
             tension: 0,
             burst: 0,
@@ -348,6 +350,10 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     // tension pulse
     new_state.player_1.tension_pulse = read_type::<isize>(player_1.offset(0x2D128));
     new_state.player_2.tension_pulse = read_type::<isize>(player_2.offset(0x2D128));
+
+    // untech time
+    new_state.player_1.untechable_time = read_type::<usize>(player_1.offset(0x9808));
+    new_state.player_2.untechable_time = read_type::<usize>(player_2.offset(0x9808));
 
     // tension bar
     new_state.player_1.tension = read_type::<isize>(player_1.offset(0x2D134));
