@@ -122,6 +122,8 @@ pub struct HitInfo {
     attack_level: u32,
     attacker: ObjectId,
     attacker_state: String,
+    victim_state: String,
+    victim_previous_state: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -171,6 +173,7 @@ pub struct PlayerState {
     burst: isize,
     risc: isize,
     state: String,
+    previous_state: String,
     round_wins: usize,
 }
 
@@ -185,6 +188,7 @@ impl PlayerState {
             burst: 0,
             risc: 0,
             state: String::new(),
+            previous_state: String::new(),
             round_wins: 0,
         }
     }
@@ -371,6 +375,11 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_1.state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
     new_state.player_2.state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
+    
+    // current state
+    new_state.player_1.previous_state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2424)));
+    new_state.player_2.previous_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2424)));
+
     // round wins
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
     new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
@@ -418,6 +427,8 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attack_level: attack_lvl,
             attacker,
             attacker_state,
+            victim_state: new_state.player_1.state.clone(),
+            victim_previous_state: new_state.player_1.previous_state.clone(),
         }))
         .unwrap();
 
@@ -453,6 +464,8 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attack_level: attack_lvl,
             attacker,
             attacker_state,
+            victim_state: new_state.player_2.state.clone(),
+            victim_previous_state: new_state.player_2.previous_state.clone(),
         }))
         .unwrap();
 
