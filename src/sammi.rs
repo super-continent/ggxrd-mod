@@ -124,6 +124,7 @@ pub struct HitInfo {
     attacker_state: String,
     victim_state: String,
     victim_previous_state: String,
+    combo_length: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -436,6 +437,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attacker_state,
             victim_state: new_state.player_1.state.clone(),
             victim_previous_state: new_state.player_1.previous_state.clone(),
+            combo_length: new_state.player_2.combo_counter,
         }))
         .unwrap();
 
@@ -473,6 +475,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attacker_state,
             victim_state: new_state.player_2.state.clone(),
             victim_previous_state: new_state.player_2.previous_state.clone(),
+            combo_length: new_state.player_1.combo_counter,
         }))
         .unwrap();
 
