@@ -388,9 +388,11 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
     new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
 
+    // combo counters are actually held inside the opponent, 
+    // so we switch them to make the data easier to understand
     log::trace!("combo counter");
-    // new_state.player_1.combo_counter = read_type::<usize>(player_1.offset(0x1A08D4));
-    // new_state.player_2.combo_counter = read_type::<usize>(player_2.offset(0x17373C));
+    new_state.player_1.combo_counter = read_type::<usize>(player_2.offset(0x9F28));
+    new_state.player_2.combo_counter = read_type::<usize>(player_1.offset(0x9F28));
 
     // type of the last hit recieved
     let last_hit_type_p1 = read_type::<usize>(player_1.offset(0x990));
