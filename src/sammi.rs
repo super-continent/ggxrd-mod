@@ -349,48 +349,48 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_2.character =
         Character::from_number(read_type::<usize>(player_2.offset(0x44)));
 
-    // health
+    log::trace!("Collecting state data");
+
     // max with 0 and usize conversion ensures 0..MAX range
+    log::trace!("health");
     new_state.player_1.health = read_type::<isize>(player_1.offset(0x9CC)).max(0) as usize;
     new_state.player_2.health = read_type::<isize>(player_2.offset(0x9CC)).max(0) as usize;
 
-    // tension pulse
+    log::trace!("tension pulse");
     new_state.player_1.tension_pulse = read_type::<isize>(player_1.offset(0x2D128));
     new_state.player_2.tension_pulse = read_type::<isize>(player_2.offset(0x2D128));
 
-    // untech time
+    log::trace!("untechable time");
     new_state.player_1.untechable_time = read_type::<usize>(player_1.offset(0x9808));
     new_state.player_2.untechable_time = read_type::<usize>(player_2.offset(0x9808));
 
-    // tension bar
+    log::trace!("tension meter");
     new_state.player_1.tension = read_type::<isize>(player_1.offset(0x2D134));
     new_state.player_2.tension = read_type::<isize>(player_2.offset(0x2D134));
 
-    // burst
+    log::trace!("burst meter");
     new_state.player_1.burst = read_type::<isize>(gamestate.offset(BURST_P1));
     new_state.player_2.burst = read_type::<isize>(gamestate.offset(BURST_P2));
 
-    // risc
+    log::trace!("risc");
     new_state.player_1.risc = read_type::<isize>(player_1.offset(0x24E30));
     new_state.player_2.risc = read_type::<isize>(player_2.offset(0x24E30));
 
-    // current state
+    log::trace!("current state");
     new_state.player_1.state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
     new_state.player_2.state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
-    
-    // current state
+    log::trace!("previous state");
     new_state.player_1.previous_state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2424)));
     new_state.player_2.previous_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2424)));
 
-    // round wins
+    log::trace!("round wins");
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
     new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
 
-    // combo counter
-    new_state.player_1.combo_counter = read_type::<usize>(player_1.offset(0x1A08D4));
-    new_state.player_2.combo_counter = read_type::<usize>(player_2.offset(0x17373C));
-    
+    log::trace!("combo counter");
+    // new_state.player_1.combo_counter = read_type::<usize>(player_1.offset(0x1A08D4));
+    // new_state.player_2.combo_counter = read_type::<usize>(player_2.offset(0x17373C));
 
     // type of the last hit recieved
     let last_hit_type_p1 = read_type::<usize>(player_1.offset(0x990));
@@ -401,6 +401,8 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     let last_hit_obj_p2 = read_type::<*mut u8>(player_2.offset(0x704));
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
+
+    log::trace!("Collecting hit event data");
 
     // filter out hits which are actually chip damage
     let is_blocking_p1 = (read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
