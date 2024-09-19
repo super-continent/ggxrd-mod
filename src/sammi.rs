@@ -1,4 +1,8 @@
-use std::{ffi::CStr, sync::atomic::{AtomicBool, Ordering}, time::Duration};
+use std::{
+    ffi::CStr,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use once_cell::sync::{Lazy, OnceCell};
 use reqwest::Client;
@@ -319,8 +323,8 @@ static mut CURRENT_FRAME: usize = 0;
 static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
-static mut LAST_HIT_P1: usize = 0;
-static mut LAST_HIT_P2: usize = 0;
+static mut LAST_COMBO_COUNTER_P1: usize = 0;
+static mut LAST_COMBO_COUNTER_P2: usize = 0;
 pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
@@ -381,14 +385,16 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_2.state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     log::trace!("previous state");
-    new_state.player_1.previous_state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2424)));
-    new_state.player_2.previous_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2424)));
+    new_state.player_1.previous_state =
+        process_string(&read_type::<[u8; 32]>(player_1.offset(0x2424)));
+    new_state.player_2.previous_state =
+        process_string(&read_type::<[u8; 32]>(player_2.offset(0x2424)));
 
     log::trace!("round wins");
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
     new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
 
-    // combo counters are actually held inside the opponent, 
+    // combo counters are actually held inside the opponent,
     // so we switch them to make the data easier to understand
     log::trace!("combo counter");
     new_state.player_1.combo_counter = read_type::<usize>(player_2.offset(0x9F28));
@@ -406,14 +412,11 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 
     log::trace!("Collecting hit event data");
 
-    // filter out hits which are actually chip damage
-    let is_blocking_p1 = (read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
-    let is_blocking_p2 = (read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
+    // TODO: detect blocking
+    // let is_blocking_p1 = (read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
+    // let is_blocking_p2 = (read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
 
-    if !is_blocking_p1
-        && (last_hit_type_p1 != LAST_HIT_P1
-            || new_state.player_1.health < PREVIOUS_STATE.player_1.health)
-    {
+    if LAST_COMBO_COUNTER_P2 < new_state.player_2.combo_counter {
         let hit_type = match last_hit_type_p1 {
             0 => HitType::Normal,
             2 => HitType::Counter,
@@ -444,15 +447,10 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             combo_length: new_state.player_2.combo_counter,
         }))
         .unwrap();
-
-        LAST_HIT_P1 = last_hit_type_p1;
     }
 
     // do it again for p2
-    if !is_blocking_p2
-        && (last_hit_type_p2 != LAST_HIT_P2
-            || new_state.player_2.health < PREVIOUS_STATE.player_2.health)
-    {
+    if LAST_COMBO_COUNTER_P1 < new_state.player_1.combo_counter {
         let hit_type = match last_hit_type_p2 {
             0 => HitType::Normal,
             2 => HitType::Counter,
@@ -482,9 +480,10 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             combo_length: new_state.player_1.combo_counter,
         }))
         .unwrap();
-
-        LAST_HIT_P2 = last_hit_type_p2;
     }
+
+    LAST_COMBO_COUNTER_P1 = new_state.player_1.combo_counter;
+    LAST_COMBO_COUNTER_P2 = new_state.player_2.combo_counter;
 
     // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
     let round_over = ROUND_OVER.load(std::sync::atomic::Ordering::SeqCst);
@@ -536,7 +535,9 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
 }
 
 pub unsafe fn round_init_hook(_use_2nd_initialize: bool) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) || !ROUND_OVER.load(Ordering::Relaxed) {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+        || !ROUND_OVER.load(Ordering::Relaxed)
+    {
         return;
     }
 
