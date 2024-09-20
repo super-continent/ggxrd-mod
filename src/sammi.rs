@@ -28,6 +28,7 @@ pub enum SammiMessage {
     ObjectCreated(ObjectCreatedInfo),
     RoundStart,
     RoundEnd(RoundEndInfo),
+    ComboEnd(ComboEndInfo),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,7 +50,7 @@ impl Default for SammiConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectId {
     Player1,
     Player2,
@@ -201,6 +202,16 @@ impl PlayerState {
     }
 }
 
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ComboEndInfo {
+    current_frame: usize,
+    combo_length: usize,
+    victim: ObjectId,
+    victim_state: String,
+    victim_previous_state: String,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SammiState {
     current_frame: usize,
@@ -303,6 +314,17 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
                 send_event(
                     new_agent,
                     "ggxrd_roundEndEvent".into(),
+                    info,
+                    config.timeout.abs() * 2.0,
+                );
+            }
+            SammiMessage::ComboEnd(info) => {
+                let new_agent = agent.clone();
+                let info = serde_json::ser::to_string(&info).unwrap();
+
+                send_event(
+                    new_agent,
+                    "ggxrd_comboEndEvent".into(),
                     info,
                     config.timeout.abs() * 2.0,
                 );
@@ -478,6 +500,29 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             victim_state: new_state.player_2.state.clone(),
             victim_previous_state: new_state.player_2.previous_state.clone(),
             combo_length: new_state.player_1.combo_counter,
+        }))
+        .unwrap();
+    }
+
+    log::trace!("checking for the end of combos");
+    if LAST_COMBO_COUNTER_P1 > 1 && new_state.player_1.combo_counter == 0 {
+        tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
+            current_frame: CURRENT_FRAME,
+            victim: ObjectId::Player2,
+            victim_state: new_state.player_2.state.clone(),
+            victim_previous_state: new_state.player_2.previous_state.clone(),
+            combo_length: new_state.player_1.combo_counter,
+        }))
+        .unwrap();
+    }
+
+    if LAST_COMBO_COUNTER_P2 > 1 && new_state.player_2.combo_counter == 0 {
+        tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
+            current_frame: CURRENT_FRAME,
+            victim: ObjectId::Player1,
+            victim_state: new_state.player_1.state.clone(),
+            victim_previous_state: new_state.player_1.previous_state.clone(),
+            combo_length: new_state.player_2.combo_counter,
         }))
         .unwrap();
     }
