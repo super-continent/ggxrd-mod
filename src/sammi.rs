@@ -182,6 +182,8 @@ pub struct PlayerState {
     previous_state: String,
     round_wins: usize,
     combo_counter: usize,
+    x_position: isize,
+    y_position: isize,
 }
 
 impl PlayerState {
@@ -198,6 +200,8 @@ impl PlayerState {
             previous_state: String::new(),
             round_wins: 0,
             combo_counter: 0,
+            x_position: 0,
+            y_position: 0,
         }
     }
 }
@@ -421,6 +425,14 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     log::trace!("combo counter");
     new_state.player_1.combo_counter = read_type::<usize>(player_2.offset(0x9F28));
     new_state.player_2.combo_counter = read_type::<usize>(player_1.offset(0x9F28));
+
+    log::trace!("X position");
+    new_state.player_1.x_position = read_type::<isize>(player_1.offset(0x24C));
+    new_state.player_2.x_position = read_type::<isize>(player_2.offset(0x24C));
+
+    log::trace!("Y position");
+    new_state.player_1.x_position = read_type::<isize>(player_1.offset(0x250));
+    new_state.player_2.x_position = read_type::<isize>(player_2.offset(0x250));
 
     // type of the last hit recieved
     let last_hit_type_p1 = read_type::<usize>(player_1.offset(0x990));
