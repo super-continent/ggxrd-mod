@@ -125,6 +125,7 @@ pub struct HitInfo {
     hit_type: HitType,
     player_hit: ObjectId,
     attack_level: u32,
+    damage: usize,
     attacker: ObjectId,
     attacker_state: String,
     victim_state: String,
@@ -211,6 +212,7 @@ impl PlayerState {
 pub struct ComboEndInfo {
     current_frame: usize,
     combo_length: usize,
+    combo_damage: usize,
     victim: ObjectId,
     victim_state: String,
     victim_previous_state: String,
@@ -469,11 +471,14 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attack_lvl = read_type::<u32>(last_hit_obj_p1.offset(0x450));
         }
 
+        let damage = read_type::<usize>(player_1.offset(0x9F48));
+
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             current_frame: CURRENT_FRAME,
             hit_type,
             player_hit: ObjectId::Player1,
             attack_level: attack_lvl,
+            damage,
             attacker,
             attacker_state,
             victim_state: new_state.player_1.state.clone(),
@@ -502,11 +507,14 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             attack_lvl = read_type::<u32>(last_hit_obj_p2.offset(0x450));
         }
 
+        let damage = read_type::<usize>(player_2.offset(0x9F48));
+
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             current_frame: CURRENT_FRAME,
             hit_type,
             player_hit: ObjectId::Player2,
             attack_level: attack_lvl,
+            damage,
             attacker,
             attacker_state,
             victim_state: new_state.player_2.state.clone(),
@@ -524,6 +532,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             victim_state: new_state.player_2.state.clone(),
             victim_previous_state: new_state.player_2.previous_state.clone(),
             combo_length: new_state.player_1.combo_counter,
+            combo_damage: read_type::<usize>(player_2.offset(0x9F44)),
         }))
         .unwrap();
     }
@@ -535,6 +544,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             victim_state: new_state.player_1.state.clone(),
             victim_previous_state: new_state.player_1.previous_state.clone(),
             combo_length: new_state.player_2.combo_counter,
+            combo_damage: read_type::<usize>(player_1.offset(0x9F44)),
         }))
         .unwrap();
     }
