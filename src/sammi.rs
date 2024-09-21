@@ -123,11 +123,11 @@ impl Character {
 pub struct HitInfo {
     current_frame: usize,
     hit_type: HitType,
-    player_hit: ObjectId,
     attack_level: u32,
     damage: usize,
     attacker: ObjectId,
     attacker_state: String,
+    victim: ObjectId,
     victim_state: String,
     victim_previous_state: String,
     combo_length: usize,
@@ -477,7 +477,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             current_frame: CURRENT_FRAME,
             hit_type,
-            player_hit: ObjectId::Player1,
+            victim: ObjectId::Player1,
             attack_level: attack_lvl,
             damage,
             attacker,
@@ -513,7 +513,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
             current_frame: CURRENT_FRAME,
             hit_type,
-            player_hit: ObjectId::Player2,
+            victim: ObjectId::Player2,
             attack_level: attack_lvl,
             damage,
             attacker,

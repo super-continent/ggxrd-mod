@@ -130,11 +130,11 @@ PlayerState {
 ```rs
 current_frame: usize,
 hit_type: HitType,
-player_hit: ObjectId,
 attack_level: u32,
 damage: usize,
 attacker: ObjectId,
 attacker_state: String,
+victim: ObjectId,
 victim_state: String,
 victim_previous_state: String,
 combo_length: usize,
