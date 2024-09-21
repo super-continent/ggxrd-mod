@@ -74,7 +74,7 @@ The enum types are:
 'MortalCounter'
 ```
 
-*ObjectId*: An object in game being referenced
+**ObjectId**: An object in game being referenced
 ```js
 'Player1'
 'Player2'
@@ -98,6 +98,7 @@ The enum types are:
 
 `eventInfo` fields:
 ```rs
+current_frame: usize,
 round_time_limit: usize,
 round_time_left: usize,
 player_1: PlayerState,
@@ -110,11 +111,16 @@ PlayerState {
     character: Character,
     health: usize,
     tension_pulse: isize,
+    untechable_time: usize,
     tension: isize,
     burst: isize,
     risc: isize,
     state: String,
+    previous_state: String,
     round_wins: usize,
+    combo_counter: usize,
+    x_position: isize,
+    y_position: isize,
 }
 ```
 
@@ -122,16 +128,23 @@ PlayerState {
 
 `eventInfo` fields:
 ```rs
+current_frame: usize,
 hit_type: HitType,
 player_hit: ObjectId,
+attack_level: u32,
+damage: usize,
 attacker: ObjectId,
 attacker_state: String,
+victim_state: String,
+victim_previous_state: String,
+combo_length: usize,
 ```
 
 ### `ggxrd_objectCreatedEvent`
 
 `eventInfo` fields:
 ```rs
+current_frame: usize,
 object_name: String,
 created_by: ObjectId,
 player1_state: String,
@@ -146,6 +159,21 @@ This even currently contains no data, and is only used to notify the beginning o
 
 `eventInfo` fields:
 ```rs
+current_frame: usize,
 winner: Winner,
 cause: RoundEndCause,
+```
+
+### `ggxrd_comboEndEvent`
+
+Triggers after 2 or more hits combo a character
+
+`eventInfo` fields:
+```rs
+current_frame: usize,
+combo_length: usize,
+combo_damage: usize,
+victim: ObjectId,
+victim_state: String,
+victim_previous_state: String,
 ```
