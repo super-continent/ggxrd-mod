@@ -428,13 +428,14 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_1.combo_counter = read_type::<usize>(player_2.offset(0x9F28));
     new_state.player_2.combo_counter = read_type::<usize>(player_1.offset(0x9F28));
 
+    log::debug!("Player ptr: {:X?}, {:X?}", player_1, player_2);
     log::trace!("X position");
     new_state.player_1.x_position = read_type::<isize>(player_1.offset(0x24C));
     new_state.player_2.x_position = read_type::<isize>(player_2.offset(0x24C));
 
     log::trace!("Y position");
-    new_state.player_1.x_position = read_type::<isize>(player_1.offset(0x250));
-    new_state.player_2.x_position = read_type::<isize>(player_2.offset(0x250));
+    new_state.player_1.y_position = read_type::<isize>(player_1.offset(0x250));
+    new_state.player_2.y_position = read_type::<isize>(player_2.offset(0x250));
 
     // type of the last hit recieved
     let last_hit_type_p1 = read_type::<usize>(player_1.offset(0x990));
@@ -531,7 +532,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             victim: ObjectId::Player2,
             victim_state: new_state.player_2.state.clone(),
             victim_previous_state: new_state.player_2.previous_state.clone(),
-            combo_length: new_state.player_1.combo_counter,
+            combo_length: LAST_COMBO_COUNTER_P1,
             combo_damage: read_type::<usize>(player_2.offset(0x9F44)),
         }))
         .unwrap();
@@ -543,7 +544,7 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
             victim: ObjectId::Player1,
             victim_state: new_state.player_1.state.clone(),
             victim_previous_state: new_state.player_1.previous_state.clone(),
-            combo_length: new_state.player_2.combo_counter,
+            combo_length: LAST_COMBO_COUNTER_P2,
             combo_damage: read_type::<usize>(player_1.offset(0x9F44)),
         }))
         .unwrap();
