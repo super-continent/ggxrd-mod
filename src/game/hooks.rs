@@ -35,11 +35,11 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
     log::debug!("update_battle: {}", update_battle_fn as usize);
 
-    UpdateBattleHook
-        .initialize(update_battle_fn, |x, b| {
-            update_battle_hook(x, b);
-        })?
-        .enable()?;
+    // UpdateBattleHook
+    //     .initialize(update_battle_fn, |x, b| {
+    //         update_battle_hook(x, b);
+    //     })?
+    //     .enable()?;
 
     let control_battle_object_fn = make_fn!(get_aob_offset(&offset::FN_CONTROL_BATTLE_OBJECT).unwrap() => unsafe extern "thiscall" fn (*mut u8));
 
@@ -106,12 +106,6 @@ unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
         update_draw as u8
     );
     UpdateBattleHook.call(game_state, update_draw);
-
-    #[cfg(feature = "sammi")]
-    // only collect data on frames that are not rollback simulations
-    if update_draw {
-        crate::sammi::game_loop_hook_sammi(game_state);
-    }
 }
 
 // Hook for the fn that transfers script pointers.

@@ -207,7 +207,6 @@ impl PlayerState {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ComboEndInfo {
     current_frame: usize,
@@ -353,15 +352,18 @@ static mut FRAME_ACCUMULATOR: f32 = 0.0;
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
 static mut LAST_COMBO_COUNTER_P1: usize = 0;
 static mut LAST_COMBO_COUNTER_P2: usize = 0;
-pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
+pub unsafe fn game_loop_hook_sammi() {
+    let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
+
+    if gamestate.is_null() {
+        return;
+    }
+
     if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
     }
 
     CURRENT_FRAME += 1;
-
-    let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
-
     let mut new_state = SammiState::new();
 
     // get game state
@@ -428,7 +430,6 @@ pub unsafe fn game_loop_hook_sammi(_state: *mut u8) {
     new_state.player_1.combo_counter = read_type::<usize>(player_2.offset(0x9F28));
     new_state.player_2.combo_counter = read_type::<usize>(player_1.offset(0x9F28));
 
-    log::debug!("Player ptr: {:X?}, {:X?}", player_1, player_2);
     log::trace!("X position");
     new_state.player_1.x_position = read_type::<isize>(player_1.offset(0x24C));
     new_state.player_2.x_position = read_type::<isize>(player_2.offset(0x24C));
