@@ -527,7 +527,7 @@ pub unsafe fn game_loop_hook_sammi() {
     }
 
     log::trace!("checking for the end of combos");
-    if LAST_COMBO_COUNTER_P1 > 1 && new_state.player_1.combo_counter == 0 {
+    if LAST_COMBO_COUNTER_P1 > 0 && new_state.player_1.combo_counter == 0 {
         tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
             current_frame: CURRENT_FRAME,
             victim: ObjectId::Player2,
@@ -539,7 +539,7 @@ pub unsafe fn game_loop_hook_sammi() {
         .unwrap();
     }
 
-    if LAST_COMBO_COUNTER_P2 > 1 && new_state.player_2.combo_counter == 0 {
+    if LAST_COMBO_COUNTER_P2 > 0 && new_state.player_2.combo_counter == 0 {
         tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
             current_frame: CURRENT_FRAME,
             victim: ObjectId::Player1,
