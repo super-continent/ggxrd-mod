@@ -1,7 +1,7 @@
 use std::{
     ffi::CStr,
     sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use once_cell::sync::{Lazy, OnceCell};
@@ -343,6 +343,8 @@ fn process_string(arr: &[u8]) -> String {
     String::from(CStr::from_bytes_until_nul(arr).unwrap().to_str().unwrap())
 }
 
+static mut PREVIOUS_INSTANT: Lazy<Instant> = Lazy::new(|| Instant::now());
+
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
 static mut CURRENT_FRAME: usize = 0;
@@ -359,6 +361,12 @@ pub unsafe fn game_loop_hook_sammi() {
 
     if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
+    }
+
+    if PREVIOUS_INSTANT.elapsed().as_secs_f64() > 1.0 / 60.0 {
+        *PREVIOUS_INSTANT = Instant::now();
+    } else {
+        return
     }
 
     CURRENT_FRAME += 1;
