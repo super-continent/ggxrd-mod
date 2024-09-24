@@ -346,16 +346,14 @@ fn process_string(arr: &[u8]) -> String {
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
 static mut CURRENT_FRAME: usize = 0;
-
 static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
-static mut LAST_COMBO_COUNTER_P1: usize = 0;
-static mut LAST_COMBO_COUNTER_P2: usize = 0;
 pub unsafe fn game_loop_hook_sammi() {
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
     if gamestate.is_null() {
+        ROUND_OVER.store(true, Ordering::Relaxed);
         return;
     }
 
@@ -454,7 +452,7 @@ pub unsafe fn game_loop_hook_sammi() {
     // let is_blocking_p1 = (read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
     // let is_blocking_p2 = (read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
 
-    if LAST_COMBO_COUNTER_P2 < new_state.player_2.combo_counter {
+    if PREVIOUS_STATE.player_2.combo_counter < new_state.player_2.combo_counter {
         let hit_type = match last_hit_type_p1 {
             0 => HitType::Normal,
             2 => HitType::Counter,
@@ -491,7 +489,7 @@ pub unsafe fn game_loop_hook_sammi() {
     }
 
     // do it again for p2
-    if LAST_COMBO_COUNTER_P1 < new_state.player_1.combo_counter {
+    if PREVIOUS_STATE.player_1.combo_counter < new_state.player_1.combo_counter {
         let hit_type = match last_hit_type_p2 {
             0 => HitType::Normal,
             2 => HitType::Counter,
@@ -527,32 +525,29 @@ pub unsafe fn game_loop_hook_sammi() {
     }
 
     log::trace!("checking for the end of combos");
-    if LAST_COMBO_COUNTER_P1 > 0 && new_state.player_1.combo_counter == 0 {
+    if PREVIOUS_STATE.player_1.combo_counter > 0 && new_state.player_1.combo_counter == 0 {
         tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
             current_frame: CURRENT_FRAME,
             victim: ObjectId::Player2,
             victim_state: new_state.player_2.state.clone(),
             victim_previous_state: new_state.player_2.previous_state.clone(),
-            combo_length: LAST_COMBO_COUNTER_P1,
+            combo_length: PREVIOUS_STATE.player_1.combo_counter,
             combo_damage: read_type::<usize>(player_2.offset(0x9F44)),
         }))
         .unwrap();
     }
 
-    if LAST_COMBO_COUNTER_P2 > 0 && new_state.player_2.combo_counter == 0 {
+    if PREVIOUS_STATE.player_2.combo_counter > 0 && new_state.player_2.combo_counter == 0 {
         tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
             current_frame: CURRENT_FRAME,
             victim: ObjectId::Player1,
             victim_state: new_state.player_1.state.clone(),
             victim_previous_state: new_state.player_1.previous_state.clone(),
-            combo_length: LAST_COMBO_COUNTER_P2,
+            combo_length: PREVIOUS_STATE.player_2.combo_counter,
             combo_damage: read_type::<usize>(player_1.offset(0x9F44)),
         }))
         .unwrap();
     }
-
-    LAST_COMBO_COUNTER_P1 = new_state.player_1.combo_counter;
-    LAST_COMBO_COUNTER_P2 = new_state.player_2.combo_counter;
 
     // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
     let round_over = ROUND_OVER.load(std::sync::atomic::Ordering::SeqCst);
