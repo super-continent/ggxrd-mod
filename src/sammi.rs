@@ -343,11 +343,9 @@ fn process_string(arr: &[u8]) -> String {
     String::from(CStr::from_bytes_until_nul(arr).unwrap().to_str().unwrap())
 }
 
-static mut PREVIOUS_INSTANT: Lazy<Instant> = Lazy::new(|| Instant::now());
-
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
-static mut CURRENT_FRAME: usize = 0;
+static mut PREVIOUS_FRAME: usize = 0;
 static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
@@ -363,17 +361,16 @@ pub unsafe fn game_loop_hook_sammi() {
         return;
     }
 
-    if PREVIOUS_INSTANT.elapsed().as_secs_f64() > 1.0 / 60.0 {
-        *PREVIOUS_INSTANT = Instant::now();
-    } else {
+    let current_frame = read_type::<usize>(gamestate.offset(0x47C));
+
+    if PREVIOUS_FRAME == current_frame {
         return
     }
 
-    CURRENT_FRAME += 1;
     let mut new_state = SammiState::new();
 
     // get game state
-    new_state.current_frame = CURRENT_FRAME;
+    new_state.current_frame = current_frame;
 
     new_state.rounds_to_win = read_type::<usize>(gamestate.offset(ROUNDS_TO_WIN));
 
@@ -482,7 +479,7 @@ pub unsafe fn game_loop_hook_sammi() {
         let damage = read_type::<usize>(player_1.offset(0x9F48));
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
-            current_frame: CURRENT_FRAME,
+            current_frame: new_state.current_frame,
             hit_type,
             victim: ObjectId::Player1,
             attack_level: attack_lvl,
@@ -518,7 +515,7 @@ pub unsafe fn game_loop_hook_sammi() {
         let damage = read_type::<usize>(player_2.offset(0x9F48));
 
         tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
-            current_frame: CURRENT_FRAME,
+            current_frame: new_state.current_frame,
             hit_type,
             victim: ObjectId::Player2,
             attack_level: attack_lvl,
@@ -535,7 +532,7 @@ pub unsafe fn game_loop_hook_sammi() {
     log::trace!("checking for the end of combos");
     if PREVIOUS_STATE.player_1.combo_counter > 0 && new_state.player_1.combo_counter == 0 {
         tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
-            current_frame: CURRENT_FRAME,
+            current_frame: new_state.current_frame,
             victim: ObjectId::Player2,
             victim_state: new_state.player_2.state.clone(),
             victim_previous_state: new_state.player_2.previous_state.clone(),
@@ -547,7 +544,7 @@ pub unsafe fn game_loop_hook_sammi() {
 
     if PREVIOUS_STATE.player_2.combo_counter > 0 && new_state.player_2.combo_counter == 0 {
         tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
-            current_frame: CURRENT_FRAME,
+            current_frame: new_state.current_frame,
             victim: ObjectId::Player1,
             victim_state: new_state.player_1.state.clone(),
             victim_previous_state: new_state.player_1.previous_state.clone(),
@@ -579,7 +576,7 @@ pub unsafe fn game_loop_hook_sammi() {
             RoundEndCause::Death
         };
         tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo {
-            current_frame: CURRENT_FRAME,
+            current_frame: new_state.current_frame,
             winner,
             cause,
         }))
@@ -603,6 +600,7 @@ pub unsafe fn game_loop_hook_sammi() {
     }
 
     PREVIOUS_STATE = new_state;
+    PREVIOUS_FRAME = current_frame;
     FRAME_ACCUMULATOR += 1.0 / 60.0;
 }
 
@@ -613,7 +611,7 @@ pub unsafe fn round_init_hook(_use_2nd_initialize: bool) {
         return;
     }
 
-    CURRENT_FRAME = 0;
+    PREVIOUS_FRAME = 0;
 
     ROUND_OVER.store(false, Ordering::Relaxed);
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
@@ -645,7 +643,7 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
     let player2_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     let object_created_info = ObjectCreatedInfo {
-        current_frame: CURRENT_FRAME,
+        current_frame: PREVIOUS_FRAME,
         created_by,
         player1_state,
         player2_state,
