@@ -345,7 +345,7 @@ fn process_string(arr: &[u8]) -> String {
 
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
-static mut PREVIOUS_FRAME: usize = 0;
+static mut CURRENT_FRAME: usize = 0;
 static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
 static mut PREVIOUS_STATE: SammiState = SammiState::new();
@@ -361,16 +361,12 @@ pub unsafe fn game_loop_hook_sammi() {
         return;
     }
 
-    let current_frame = read_type::<usize>(gamestate.offset(0x47C));
-
-    if PREVIOUS_FRAME == current_frame {
-        return
-    }
+    CURRENT_FRAME += 1;
 
     let mut new_state = SammiState::new();
 
     // get game state
-    new_state.current_frame = current_frame;
+    new_state.current_frame = CURRENT_FRAME;
 
     new_state.rounds_to_win = read_type::<usize>(gamestate.offset(ROUNDS_TO_WIN));
 
@@ -600,7 +596,6 @@ pub unsafe fn game_loop_hook_sammi() {
     }
 
     PREVIOUS_STATE = new_state;
-    PREVIOUS_FRAME = current_frame;
     FRAME_ACCUMULATOR += 1.0 / 60.0;
 }
 
@@ -611,7 +606,7 @@ pub unsafe fn round_init_hook(_use_2nd_initialize: bool) {
         return;
     }
 
-    PREVIOUS_FRAME = 0;
+    CURRENT_FRAME = 0;
 
     ROUND_OVER.store(false, Ordering::Relaxed);
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
@@ -643,7 +638,7 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
     let player2_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
     let object_created_info = ObjectCreatedInfo {
-        current_frame: PREVIOUS_FRAME,
+        current_frame: CURRENT_FRAME,
         created_by,
         player1_state,
         player2_state,

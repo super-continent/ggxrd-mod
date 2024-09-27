@@ -189,12 +189,6 @@ fn peek_message_w_hook(
 
 fn endscene_hook(device: *mut IDirect3DDevice9) -> i32 {
     unsafe {
-        // only collect data on frames that are not rollback simulations
-        if cfg!(feature = "sammi") {
-            log::trace!("gathering state for sammi...");
-            crate::sammi::game_loop_hook_sammi();
-        }
-
         // trace!("endscene called");
         let mut state_lock = IMHOOK_STATE.lock();
         //trace!("acquired state lock");

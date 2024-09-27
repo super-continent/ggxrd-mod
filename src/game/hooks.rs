@@ -15,7 +15,7 @@ use retour::static_detour;
 static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
     static ControlBattleObjectHook: unsafe extern "thiscall" fn (*mut u8);
-    static UpdateBattleHook: unsafe extern "thiscall" fn (*mut u8, bool);
+    static GameStateAdvanceHook: unsafe extern "thiscall" fn (*mut u8, *mut u8);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
@@ -31,32 +31,20 @@ static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
 
 pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
-    let update_battle_fn = make_fn!(get_aob_offset(&offset::FN_UPDATE_BATTLE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
+    let gamestate_advance_fn = make_fn!(get_aob_offset(&offset::FN_GAMESTATE_ADVANCE).unwrap() => unsafe extern "thiscall" fn (*mut u8, *mut u8));
 
-    log::debug!("update_battle: {}", update_battle_fn as usize);
+    log::debug!("gamestate_advance: {:X}", gamestate_advance_fn as usize);
 
-    // UpdateBattleHook
-    //     .initialize(update_battle_fn, |x, b| {
-    //         update_battle_hook(x, b);
-    //     })?
-    //     .enable()?;
-
-    let control_battle_object_fn = make_fn!(get_aob_offset(&offset::FN_CONTROL_BATTLE_OBJECT).unwrap() => unsafe extern "thiscall" fn (*mut u8));
-
-    log::debug!(
-        "control_battle_object: {}",
-        control_battle_object_fn as usize
-    );
-
-    ControlBattleObjectHook.initialize(control_battle_object_fn, |x| {
-        ControlBattleObjectHook.call(x)
-    })?;
-    // .enable()?;
+    GameStateAdvanceHook
+        .initialize(gamestate_advance_fn, |x, y| {
+            gamestate_advance_hook(x, y);
+        })?
+        .enable()?;
 
     let load_bbscript_fn =
         make_fn!(get_aob_offset(&offset::FN_LOAD_BBSCRIPT).unwrap() => internal::FnLoadBBScript);
 
-    log::debug!("load_bbscript: {}", load_bbscript_fn as usize);
+    log::debug!("load_bbscript: {:X}", load_bbscript_fn as usize);
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?
@@ -66,7 +54,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     {
         let bom_init_fn = make_fn!(get_aob_offset(&offset::FN_BOM_ROUNDANDEASYRESETINITIALIZE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
 
-        log::debug!("bom_init: {}", bom_init_fn as usize);
+        log::debug!("bom_init: {:X}", bom_init_fn as usize);
 
         BOMRoundAndEasyResetInitializeHook
             .initialize(bom_init_fn, |battle_cobject_manager, use_2nd_initialize| {
@@ -82,7 +70,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
         let create_object_fn = make_fn!(get_aob_offset(&offset::FN_CREATE_OBJECT_WITH_ARG).unwrap() => unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8));
 
-        log::debug!("create_object_with_arg: {}", create_object_fn as usize);
+        log::debug!("create_object_with_arg: {:X}", create_object_fn as usize);
         CreateObjectWithArgHook
             .initialize(create_object_fn, |object, arg, ptr| {
                 log::trace!(
@@ -99,13 +87,18 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     Ok(())
 }
 
-unsafe fn update_battle_hook(game_state: *mut u8, update_draw: bool) {
+unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
     log::trace!(
-        "Got game_state {:X} and update_draw {}",
+        "Got arguments {:X} and {:X}",
         game_state as usize,
-        update_draw as u8
+        other as usize,
     );
-    UpdateBattleHook.call(game_state, update_draw);
+    GameStateAdvanceHook.call(game_state, other);
+
+    if cfg!(feature = "sammi") {
+        log::trace!("gathering state for sammi...");
+        crate::sammi::game_loop_hook_sammi();
+    }
 }
 
 // Hook for the fn that transfers script pointers.
