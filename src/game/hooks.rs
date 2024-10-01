@@ -23,6 +23,7 @@ static_detour! {
 static_detour! {
     static BOMRoundAndEasyResetInitializeHook: unsafe extern "thiscall" fn (*mut u8, bool);
     static CreateObjectWithArgHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
+    static EndComboHook: unsafe extern "thiscall" fn (*mut u8);
 }
 
 static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
@@ -81,6 +82,16 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
                 );
                 sammi::create_object_with_arg_hook(object, arg, ptr);
                 CreateObjectWithArgHook.call(object, arg, ptr);
+            })?
+            .enable()?;
+
+        let end_combo_hook = make_fn!(get_aob_offset(&offset::FN_END_COMBO).unwrap() => unsafe extern "thiscall" fn (*mut u8));
+
+        log::debug!("end_combo: {:X}", end_combo_hook as usize);
+        EndComboHook
+            .initialize(end_combo_hook, |obj| {
+                sammi::end_combo_hook(obj);
+                EndComboHook.call(obj);
             })?
             .enable()?;
     }
