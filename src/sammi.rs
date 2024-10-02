@@ -637,12 +637,18 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
     let player_1 = gamestate.offset(P1_OFFSET);
     let player_2 = gamestate.offset(P2_OFFSET);
 
+    let combo_length = read_type::<usize>(object.offset(0x9F28));
+
+    if combo_length == 0 {
+        return;
+    }
+
     let victim = if object == player_1 {
         ObjectId::Player1
     } else if object == player_2 {
         ObjectId::Player2
     } else {
-        return
+        return;
     };
 
     let victim_state = process_string(&read_type::<[u8; 32]>(object.offset(0x2444)));
@@ -655,7 +661,7 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
         victim,
         victim_state,
         victim_previous_state,
-        combo_length: read_type::<usize>(object.offset(0x9F28)),
+        combo_length,
         combo_damage: read_type::<usize>(object.offset(0x9F44)),
     }))
     .unwrap();
