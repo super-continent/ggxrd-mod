@@ -574,10 +574,8 @@ pub unsafe fn game_loop_hook_sammi() {
     FRAME_ACCUMULATOR += 1.0 / 60.0;
 }
 
-pub unsafe fn round_init_hook(_use_2nd_initialize: bool) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
-        || !ROUND_OVER.load(Ordering::Relaxed)
-    {
+pub unsafe fn round_begin() {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
     }
 

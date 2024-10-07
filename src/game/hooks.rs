@@ -24,6 +24,7 @@ static_detour! {
     static BOMRoundAndEasyResetInitializeHook: unsafe extern "thiscall" fn (*mut u8, bool);
     static CreateObjectWithArgHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
     static EndComboHook: unsafe extern "thiscall" fn (*mut u8);
+    static ActivateTimerHook: unsafe extern "thiscall" fn (*mut u8);
 }
 
 static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
@@ -53,19 +54,12 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
     #[cfg(feature = "sammi")]
     {
-        let bom_init_fn = make_fn!(get_aob_offset(&offset::FN_BOM_ROUNDANDEASYRESETINITIALIZE).unwrap() => unsafe extern "thiscall" fn (*mut u8, bool));
+        let activate_timer_fn = make_fn!(get_aob_offset(&offset::FN_ACTIVATE_TIMER).unwrap() => unsafe extern "thiscall" fn (*mut u8));
 
-        log::debug!("bom_init: {:X}", bom_init_fn as usize);
-
-        BOMRoundAndEasyResetInitializeHook
-            .initialize(bom_init_fn, |battle_cobject_manager, use_2nd_initialize| {
-                log::trace!(
-                    "BATTLE_CObjectManager: {:X}, use2ndInitialize: {}",
-                    battle_cobject_manager as usize,
-                    use_2nd_initialize
-                );
-                crate::sammi::round_init_hook(use_2nd_initialize);
-                BOMRoundAndEasyResetInitializeHook.call(battle_cobject_manager, use_2nd_initialize);
+        ActivateTimerHook
+            .initialize(activate_timer_fn, |obj| {
+                sammi::round_begin();
+                ActivateTimerHook.call(obj)
             })?
             .enable()?;
 
