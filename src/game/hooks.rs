@@ -25,6 +25,7 @@ static_detour! {
     static CreateObjectWithArgHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
     static EndComboHook: unsafe extern "thiscall" fn (*mut u8);
     static ActivateTimerHook: unsafe extern "thiscall" fn (*mut u8);
+    static ProcessHitHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
 }
 
 static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
