@@ -123,6 +123,7 @@ impl Character {
 pub struct HitInfo {
     current_frame: usize,
     hit_type: HitType,
+    was_blocked: bool,
     attack_level: u32,
     damage: usize,
     attacker: ObjectId,
@@ -437,93 +438,7 @@ pub unsafe fn game_loop_hook_sammi() {
     new_state.player_1.y_position = read_type::<isize>(player_1.offset(0x250));
     new_state.player_2.y_position = read_type::<isize>(player_2.offset(0x250));
 
-    // type of the last hit recieved
-    let last_hit_type_p1 = read_type::<usize>(player_1.offset(0x990));
-    let last_hit_type_p2 = read_type::<usize>(player_2.offset(0x990));
-
-    // pointer to the last object that hit the player
-    let last_hit_obj_p1 = read_type::<*mut u8>(player_1.offset(0x704));
-    let last_hit_obj_p2 = read_type::<*mut u8>(player_2.offset(0x704));
-
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
-
-    log::trace!("Collecting hit event data");
-
-    // TODO: detect blocking
-    // let is_blocking_p1 = (read_type::<usize>(player_1.offset(0x23C)) & 0x11000000) != 0;
-    // let is_blocking_p2 = (read_type::<usize>(player_2.offset(0x23C)) & 0x11000000) != 0;
-
-    if PREVIOUS_STATE.player_2.combo_counter < new_state.player_2.combo_counter {
-        let hit_type = match last_hit_type_p1 {
-            0 => HitType::Normal,
-            2 => HitType::Counter,
-            3 => HitType::MortalCounter,
-            _ => HitType::Unknown,
-        };
-
-        let mut attacker = ObjectId::Player2;
-        let mut attacker_state = new_state.player_2.state.clone();
-        let mut attack_lvl = read_type::<u32>(player_2.offset(0x450));
-
-        // if projectile then store projectile data
-        if last_hit_obj_p1 != player_2 && !last_hit_obj_p1.is_null() {
-            attacker = ObjectId::Projectile;
-            attacker_state = process_string(&read_type::<[u8; 32]>(last_hit_obj_p1.offset(0x2444)));
-            attack_lvl = read_type::<u32>(last_hit_obj_p1.offset(0x450));
-        }
-
-        let damage = read_type::<usize>(player_1.offset(0x9F48));
-
-        tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
-            current_frame: new_state.current_frame,
-            hit_type,
-            victim: ObjectId::Player1,
-            attack_level: attack_lvl,
-            damage,
-            attacker,
-            attacker_state,
-            victim_state: new_state.player_1.state.clone(),
-            victim_previous_state: new_state.player_1.previous_state.clone(),
-            combo_length: new_state.player_2.combo_counter,
-        }))
-        .unwrap();
-    }
-
-    // do it again for p2
-    if PREVIOUS_STATE.player_1.combo_counter < new_state.player_1.combo_counter {
-        let hit_type = match last_hit_type_p2 {
-            0 => HitType::Normal,
-            2 => HitType::Counter,
-            3 => HitType::MortalCounter,
-            _ => HitType::Unknown,
-        };
-
-        let mut attacker = ObjectId::Player1;
-        let mut attacker_state = new_state.player_1.state.clone();
-        let mut attack_lvl = read_type::<u32>(player_1.offset(0x450));
-
-        if last_hit_obj_p2 != player_1 && !last_hit_obj_p2.is_null() {
-            attacker = ObjectId::Projectile;
-            attacker_state = process_string(&read_type::<[u8; 32]>(last_hit_obj_p2.offset(0x2444)));
-            attack_lvl = read_type::<u32>(last_hit_obj_p2.offset(0x450));
-        }
-
-        let damage = read_type::<usize>(player_2.offset(0x9F48));
-
-        tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
-            current_frame: new_state.current_frame,
-            hit_type,
-            victim: ObjectId::Player2,
-            attack_level: attack_lvl,
-            damage,
-            attacker,
-            attacker_state,
-            victim_state: new_state.player_2.state.clone(),
-            victim_previous_state: new_state.player_2.previous_state.clone(),
-            combo_length: new_state.player_1.combo_counter,
-        }))
-        .unwrap();
-    }
 
     // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
     let round_over = ROUND_OVER.load(std::sync::atomic::Ordering::SeqCst);
@@ -661,6 +576,83 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
         victim_previous_state,
         combo_length,
         combo_damage: read_type::<usize>(object.offset(0x9F44)),
+    }))
+    .unwrap();
+}
+
+pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
+    log::trace!("Collecting hit event data");
+    log::debug!(
+        "process_hit_hook victim: {:X}, attacker {:X}",
+        victim as usize,
+        attacker as usize
+    );
+    let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
+
+    // victim data
+    let victim_id = if gamestate.offset(P1_OFFSET) == victim {
+        ObjectId::Player1
+    } else if gamestate.offset(P2_OFFSET) == victim {
+        ObjectId::Player2
+    } else {
+        // dont handle anything except for the players being hit
+        // this also handles null pointers
+        return;
+    };
+
+    let hit_type = match read_type::<usize>(victim.offset(0x990)) {
+        0 => HitType::Normal,
+        2 => HitType::Counter,
+        3 => HitType::MortalCounter,
+        _ => HitType::Unknown,
+    };
+
+    log::debug!("getting state");
+    let combo_length = read_type::<usize>(victim.offset(0x9F28));
+    let damage = read_type::<usize>(victim.offset(0x9F48));
+    let was_blocked = combo_length == 0;
+
+    let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
+    let victim_previous_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
+
+    // check to ensure that attacker is not null
+    // let last_hit_obj = read_type::<*mut u8>(victim.offset(0x704));
+    // if attacker.is_null() {
+    //     if !last_hit_obj.is_null() {
+    //         attacker = last_hit_obj;
+    //     } else {
+    //         log::trace!("null attacker in processhit");
+    //         return;
+    //     }
+    // }
+
+    // attacker data
+    let attacker_id = if gamestate.offset(P1_OFFSET) == attacker {
+        ObjectId::Player1
+    } else if gamestate.offset(P2_OFFSET) == attacker {
+        ObjectId::Player2
+    } else {
+        ObjectId::Projectile
+    };
+
+    let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
+    let attack_lvl = read_type::<u32>(attacker.offset(0x450));
+
+    log::debug!("sending data");
+    let tx = global::MESSAGE_SENDER.get().unwrap().clone();
+
+    tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
+        current_frame: CURRENT_FRAME,
+        hit_type,
+        was_blocked,
+        victim: victim_id,
+        attack_level: attack_lvl,
+        damage,
+        attacker: attacker_id,
+        attacker_state,
+        victim_state,
+        victim_previous_state,
+        combo_length: combo_length,
     }))
     .unwrap();
 }
