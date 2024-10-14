@@ -587,7 +587,6 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
 }
 
 pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
-    log::trace!("Collecting hit event data");
     log::debug!(
         "process_hit_hook victim: {:X}, attacker {:X}",
         victim as usize,
@@ -613,24 +612,13 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
         _ => HitType::Unknown,
     };
 
-    log::debug!("getting state");
+    log::trace!("getting state");
     let combo_length = read_type::<usize>(victim.offset(0x9F28));
     let damage = read_type::<usize>(victim.offset(0x9F48));
     let was_blocked = combo_length == 0;
 
     let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
     let victim_previous_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
-
-    // check to ensure that attacker is not null
-    // let last_hit_obj = read_type::<*mut u8>(victim.offset(0x704));
-    // if attacker.is_null() {
-    //     if !last_hit_obj.is_null() {
-    //         attacker = last_hit_obj;
-    //     } else {
-    //         log::trace!("null attacker in processhit");
-    //         return;
-    //     }
-    // }
 
     // attacker data
     let attacker_id = if gamestate.offset(P1_OFFSET) == attacker {
@@ -644,7 +632,6 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
     let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
     let attack_lvl = read_type::<u32>(attacker.offset(0x450));
 
-    log::debug!("sending data");
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
     tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
