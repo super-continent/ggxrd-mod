@@ -522,6 +522,12 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let object_name = process_string(&read_type::<[u8; 32]>(arg));
 
+
+    // keep venom from overloading the sammi connection
+    if object_name == "BallZanzoh" {
+        return;
+    }
+
     let player1_state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
     let player2_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
 
