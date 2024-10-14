@@ -34,6 +34,7 @@ Basic types:
 - `usize`: Unsigned integer (meaning it cannot be negative)
 - `isize`: Signed integer (can be negative or positive)
 - `String`: String of text in UTF-8
+- `bool`: A number where the value of `0` means false, and any other value means true
 
 Sometimes a type is an enumeration of possible values, represented as different strings.
 The enum types are:
@@ -130,6 +131,7 @@ PlayerState {
 ```rs
 current_frame: usize,
 hit_type: HitType,
+was_blocked: bool,
 attack_level: u32,
 damage: usize,
 attacker: ObjectId,
