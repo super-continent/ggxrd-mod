@@ -37,6 +37,7 @@ pub struct SammiConfig {
     pub webhook_url: String,
     pub state_update_hz: f32,
     pub timeout: f32,
+    pub developer_data: SammiDevConfig,
 }
 
 impl Default for SammiConfig {
@@ -46,7 +47,40 @@ impl Default for SammiConfig {
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
             state_update_hz: 25.0,
             timeout: 0.1,
+            developer_data: SammiDevConfig::default(),
         }
+    }
+}
+
+/// Options that may be changed in the case of a
+/// mod developer using SAMMI with modified state names
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SammiDevConfig {
+    /// States which indicate an attack should be [`HitType::Throw`]
+    throw_states: Vec<String>,
+}
+
+impl Default for SammiDevConfig {
+    fn default() -> Self {
+        let throw_states = [
+            "Genrouzan",
+            "Genyouzan",
+            "Shotgun_CQC",
+            "CommandThrow",
+            "PotemkinBuster",
+            "HeavenlyPBuster",
+            "ChiwosuuUchuu",
+            "BukkirabouNiNageru",
+            "AirCommandThrow",
+            "DamnedFang",
+            "OverHeadKiss",
+            "AntiAirCommandThrow",
+            "CommandThorw", // Arcsys' typo, not mine
+            "ScrewPileDriver",
+        ]
+        .map(|s| s.to_string())
+        .to_vec();
+        SammiDevConfig { throw_states }
     }
 }
 
@@ -523,7 +557,6 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let object_name = process_string(&read_type::<[u8; 32]>(arg));
 
-
     // keep venom from overloading the sammi connection
     if object_name == "BallZanzoh" {
         return;
@@ -588,6 +621,10 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
 }
 
 pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+
     log::debug!(
         "process_hit_hook victim: {:X}, attacker {:X}",
         victim as usize,
@@ -633,10 +670,15 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
     let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
     let attack_lvl = read_type::<u32>(attacker.offset(0x450));
 
+    // throw detection:
     // since proximity throws connect on frame 1 (earlier than any other move in the game)
     // we can safely detect them by testing a timer since the state was entered for the value of 1
+    //
+    // states are also marked as Throw if they are inside the list of throw states in the config
     let time_since_entering_state = read_type::<usize>(attacker.offset(0x13C));
-    if time_since_entering_state <= 1 {
+    let throw_states = &SAMMI_CONFIG.get().unwrap().developer_data.throw_states;
+
+    if time_since_entering_state <= 1 || throw_states.contains(&attacker_state) {
         was_blocked = false;
         hit_type = HitType::Throw;
     }
