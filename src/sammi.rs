@@ -140,6 +140,7 @@ pub enum HitType {
     Counter,
     MortalCounter,
     Unknown,
+    Throw,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -605,7 +606,7 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
         return;
     };
 
-    let hit_type = match read_type::<usize>(victim.offset(0x990)) {
+    let mut hit_type = match read_type::<usize>(victim.offset(0x990)) {
         0 => HitType::Normal,
         2 => HitType::Counter,
         3 => HitType::MortalCounter,
@@ -615,7 +616,7 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
     log::trace!("getting state");
     let combo_length = read_type::<usize>(victim.offset(0x9F28));
     let damage = read_type::<usize>(victim.offset(0x9F48));
-    let was_blocked = combo_length == 0;
+    let mut was_blocked = combo_length == 0;
 
     let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
     let victim_previous_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
@@ -631,6 +632,14 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
 
     let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
     let attack_lvl = read_type::<u32>(attacker.offset(0x450));
+
+    // since proximity throws connect on frame 1 (earlier than any other move in the game)
+    // we can safely detect them by testing a timer since the state was entered for the value of 1
+    let time_since_entering_state = read_type::<usize>(attacker.offset(0x13C));
+    if time_since_entering_state <= 1 {
+        was_blocked = false;
+        hit_type = HitType::Throw;
+    }
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
