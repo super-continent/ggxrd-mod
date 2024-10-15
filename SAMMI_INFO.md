@@ -73,6 +73,7 @@ The enum types are:
 'Normal'
 'Counter'
 'MortalCounter'
+'Throw'
 ```
 
 **ObjectId**: An object in game being referenced
