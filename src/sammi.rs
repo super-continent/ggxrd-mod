@@ -504,53 +504,61 @@ pub unsafe fn game_loop_hook_sammi() {
         .unwrap();
     }
 
-    if let Some(hit_event) = HIT_EVENT_INFO.take() {
-        let attacker = hit_event.attacker;
-        let victim = hit_event.victim;
 
-        let mut hit_type = match read_type::<usize>(victim.offset(0x990)) {
-            0 => HitType::Normal,
-            2 => HitType::Counter,
-            3 => HitType::MortalCounter,
-            _ => HitType::Unknown,
-        };
+    let should_process_hitevent = HIT_EVENT_INFO
+        .as_ref()
+        .map_or(false, |event| event.current_frame < CURRENT_FRAME + 1);
+    
+    if should_process_hitevent {
+        if let Some(hit_event) = HIT_EVENT_INFO.take() {
+            let attacker = hit_event.attacker;
+            let victim = hit_event.victim;
 
-        let combo_length = read_type::<usize>(victim.offset(0x9F28));
-        let damage = read_type::<usize>(victim.offset(0x9F48));
-        let mut was_blocked = combo_length == 0;
+            let mut hit_type = match read_type::<usize>(victim.offset(0x990)) {
+                0 => HitType::Normal,
+                2 => HitType::Counter,
+                3 => HitType::MortalCounter,
+                _ => HitType::Unknown,
+            };
 
-        let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
-        let victim_previous_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
+            let combo_length = read_type::<usize>(victim.offset(0x9F28));
+            let damage = read_type::<usize>(victim.offset(0x9F48));
+            let mut was_blocked = combo_length == 0;
 
-        let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
-        let attack_lvl = read_type::<u32>(attacker.offset(0x450));
+            let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
+            let victim_previous_state =
+                process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
 
-        // throw detection:
-        // since proximity throws connect on frame 1 (earlier than any other move in the game)
-        // we can safely detect them by testing a timer since the state was entered for the value of 1
-        //
-        // states are also marked as Throw if they are inside the list of throw states in the config
-        let throw_states = &SAMMI_CONFIG.get().unwrap().developer_data.throw_states;
+            let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
+            let attack_lvl = read_type::<u32>(attacker.offset(0x450));
 
-        if throw_states.contains(&attacker_state) {
-            was_blocked = false;
-            hit_type = HitType::Throw;
+            // throw detection:
+            // since proximity throws connect on frame 1 (earlier than any other move in the game)
+            // we can safely detect them by testing a timer since the state was entered for the value of 1
+            //
+            // states are also marked as Throw if they are inside the list of throw states in the config
+            let throw_states = &SAMMI_CONFIG.get().unwrap().developer_data.throw_states;
+
+            if throw_states.contains(&attacker_state) {
+                was_blocked = false;
+                hit_type = HitType::Throw;
+            }
+
+            tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
+                current_frame: CURRENT_FRAME,
+                hit_type,
+                was_blocked,
+                victim: hit_event.victim_id,
+                attack_level: attack_lvl,
+                damage,
+                attacker: hit_event.attacker_id,
+                attacker_state,
+                victim_state,
+                victim_previous_state,
+                combo_length: combo_length,
+            }))
+            .unwrap();
         }
-
-        tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
-            current_frame: CURRENT_FRAME,
-            hit_type,
-            was_blocked,
-            victim: hit_event.victim_id,
-            attack_level: attack_lvl,
-            damage,
-            attacker: hit_event.attacker_id,
-            attacker_state,
-            victim_state,
-            victim_previous_state,
-            combo_length: combo_length,
-        }))
-        .unwrap();
     }
 
     // get config and check if we should update state depending on frameskip
@@ -674,6 +682,7 @@ struct HitEventInfoInternal {
     attacker_id: ObjectId,
     victim: *mut u8,
     victim_id: ObjectId,
+    current_frame: usize,
 }
 
 static mut HIT_EVENT_INFO: Option<HitEventInfoInternal> = None;
@@ -706,6 +715,7 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
     };
 
     HIT_EVENT_INFO = Some(HitEventInfoInternal {
+        current_frame: CURRENT_FRAME,
         attacker,
         attacker_id,
         victim,
