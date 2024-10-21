@@ -73,6 +73,7 @@ The enum types are:
 'Normal'
 'Counter'
 'MortalCounter'
+'Throw'
 ```
 
 **ObjectId**: An object in game being referenced
@@ -132,7 +133,7 @@ PlayerState {
 current_frame: usize,
 hit_type: HitType,
 was_blocked: bool,
-attack_level: u32,
+attack_level: usize,
 damage: usize,
 attacker: ObjectId,
 attacker_state: String,
