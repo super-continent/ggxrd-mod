@@ -64,21 +64,37 @@ impl Default for SammiDevConfig {
     fn default() -> Self {
         let throw_states = [
             "Genrouzan",
+            "GenrouzanExe",
             "Genyouzan",
+            "GenyouzanExe",
             "Shotgun_CQC",
+            "Shotgun_CQCExe",
             "CommandThrow",
+            "CommandThrowExe",
+            "CommandThrowEx",
             "PotemkinBuster",
+            "PotemkinBusterExe",
             "HeavenlyPBuster",
+            "HeavenlyPBusterExe",
             "ChiwosuuUchuu",
+            "ChiwosuuUchuuExe",
             "BukkirabouNiNageru",
+            "BukkiraExe",
             "AirCommandThrow",
+            "AirCommandThrowExe",
             "DamnedFang",
+            "DamnedFangExe",
             "OverHeadKiss",
+            "OverHeadKissExe",
             "AntiAirCommandThrow",
+            "AntiAirCommandThrowEx",
             "CommandThorw", // Arcsys' typo, not mine
+            "CommandThorwEx",
             "ScrewPileDriver",
+            "ScrewPileDriverEx",
             "ThrowExe",
             "AirThrowExe",
+            "Mozu_Land_Exe",
         ]
         .map(|s| s.to_string())
         .to_vec();
