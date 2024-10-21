@@ -507,7 +507,7 @@ pub unsafe fn game_loop_hook_sammi() {
 
     let should_process_hitevent = HIT_EVENT_INFO
         .as_ref()
-        .map_or(false, |event| event.current_frame < CURRENT_FRAME + 1);
+        .map_or(false, |event| event.current_frame < CURRENT_FRAME - 1);
     
     if should_process_hitevent {
         if let Some(hit_event) = HIT_EVENT_INFO.take() {
