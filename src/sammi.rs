@@ -77,6 +77,8 @@ impl Default for SammiDevConfig {
             "AntiAirCommandThrow",
             "CommandThorw", // Arcsys' typo, not mine
             "ScrewPileDriver",
+            "ThrowExe",
+            "AirThrowExe",
         ]
         .map(|s| s.to_string())
         .to_vec();
