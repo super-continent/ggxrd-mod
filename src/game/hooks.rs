@@ -107,12 +107,13 @@ unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
         game_state as usize,
         other as usize,
     );
-    GameStateAdvanceHook.call(game_state, other);
 
     if cfg!(feature = "sammi") {
         log::trace!("gathering state for sammi...");
         crate::sammi::game_loop_hook_sammi();
     }
+
+    GameStateAdvanceHook.call(game_state, other);
 }
 
 // Hook for the fn that transfers script pointers.

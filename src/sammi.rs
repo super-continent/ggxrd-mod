@@ -504,6 +504,55 @@ pub unsafe fn game_loop_hook_sammi() {
         .unwrap();
     }
 
+    if let Some(hit_event) = HIT_EVENT_INFO.take() {
+        let attacker = hit_event.attacker;
+        let victim = hit_event.victim;
+
+        let mut hit_type = match read_type::<usize>(victim.offset(0x990)) {
+            0 => HitType::Normal,
+            2 => HitType::Counter,
+            3 => HitType::MortalCounter,
+            _ => HitType::Unknown,
+        };
+
+        let combo_length = read_type::<usize>(victim.offset(0x9F28));
+        let damage = read_type::<usize>(victim.offset(0x9F48));
+        let mut was_blocked = combo_length == 0;
+
+        let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
+        let victim_previous_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
+
+        let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
+        let attack_lvl = read_type::<u32>(attacker.offset(0x450));
+
+        // throw detection:
+        // since proximity throws connect on frame 1 (earlier than any other move in the game)
+        // we can safely detect them by testing a timer since the state was entered for the value of 1
+        //
+        // states are also marked as Throw if they are inside the list of throw states in the config
+        let throw_states = &SAMMI_CONFIG.get().unwrap().developer_data.throw_states;
+
+        if throw_states.contains(&attacker_state) {
+            was_blocked = false;
+            hit_type = HitType::Throw;
+        }
+
+        tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
+            current_frame: CURRENT_FRAME,
+            hit_type,
+            was_blocked,
+            victim: hit_event.victim_id,
+            attack_level: attack_lvl,
+            damage,
+            attacker: hit_event.attacker_id,
+            attacker_state,
+            victim_state,
+            victim_previous_state,
+            combo_length: combo_length,
+        }))
+        .unwrap();
+    }
+
     // get config and check if we should update state depending on frameskip
     let config = SAMMI_CONFIG.get().unwrap();
     let update_t = 1.0 / config.state_update_hz.clamp(1.0, 60.0);
@@ -620,45 +669,34 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
     .unwrap();
 }
 
+struct HitEventInfoInternal {
+    attacker: *mut u8,
+    attacker_id: ObjectId,
+    victim: *mut u8,
+    victim_id: ObjectId,
+}
+
+static mut HIT_EVENT_INFO: Option<HitEventInfoInternal> = None;
+
 pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
+        || attacker.is_null()
+        || victim.is_null()
+    {
         return;
     }
 
-    log::debug!(
-        "process_hit_hook victim: {:X}, attacker {:X}",
-        victim as usize,
-        attacker as usize
-    );
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
-    // victim data
     let victim_id = if gamestate.offset(P1_OFFSET) == victim {
         ObjectId::Player1
     } else if gamestate.offset(P2_OFFSET) == victim {
         ObjectId::Player2
     } else {
         // dont handle anything except for the players being hit
-        // this also handles null pointers
         return;
     };
 
-    let mut hit_type = match read_type::<usize>(victim.offset(0x990)) {
-        0 => HitType::Normal,
-        2 => HitType::Counter,
-        3 => HitType::MortalCounter,
-        _ => HitType::Unknown,
-    };
-
-    log::trace!("getting state");
-    let combo_length = read_type::<usize>(victim.offset(0x9F28));
-    let damage = read_type::<usize>(victim.offset(0x9F48));
-    let mut was_blocked = combo_length == 0;
-
-    let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
-    let victim_previous_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
-
-    // attacker data
     let attacker_id = if gamestate.offset(P1_OFFSET) == attacker {
         ObjectId::Player1
     } else if gamestate.offset(P2_OFFSET) == attacker {
@@ -667,36 +705,10 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
         ObjectId::Projectile
     };
 
-    let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
-    let attack_lvl = read_type::<u32>(attacker.offset(0x450));
-
-    // throw detection:
-    // since proximity throws connect on frame 1 (earlier than any other move in the game)
-    // we can safely detect them by testing a timer since the state was entered for the value of 1
-    //
-    // states are also marked as Throw if they are inside the list of throw states in the config
-    let time_since_entering_state = read_type::<usize>(attacker.offset(0x13C));
-    let throw_states = &SAMMI_CONFIG.get().unwrap().developer_data.throw_states;
-
-    if time_since_entering_state <= 1 || throw_states.contains(&attacker_state) {
-        was_blocked = false;
-        hit_type = HitType::Throw;
-    }
-
-    let tx = global::MESSAGE_SENDER.get().unwrap().clone();
-
-    tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
-        current_frame: CURRENT_FRAME,
-        hit_type,
-        was_blocked,
-        victim: victim_id,
-        attack_level: attack_lvl,
-        damage,
-        attacker: attacker_id,
-        attacker_state,
-        victim_state,
-        victim_previous_state,
-        combo_length: combo_length,
-    }))
-    .unwrap();
+    HIT_EVENT_INFO = Some(HitEventInfoInternal {
+        attacker,
+        attacker_id,
+        victim,
+        victim_id,
+    })
 }
