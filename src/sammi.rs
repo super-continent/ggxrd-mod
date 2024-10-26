@@ -227,7 +227,7 @@ pub struct ObjectCreatedInfo {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PlayerState {
-    steam_id: u64,
+    steam_id: String,
     steam_nickname: String,
     character: Character,
     health: usize,
@@ -247,7 +247,7 @@ pub struct PlayerState {
 impl PlayerState {
     const fn new() -> Self {
         Self {
-            steam_id: 0,
+            steam_id: String::new(),
             steam_nickname: String::new(),
             character: Character::Sol,
             health: 420,
@@ -516,10 +516,10 @@ pub unsafe fn game_loop_hook_sammi() {
         P2_STEAM_NAME = steam::get_name_from_id(p2_steamid);
     }
 
-    new_state.player_1.steam_id = p1_steamid;
+    new_state.player_1.steam_id = format!("{}", p1_steamid);
     new_state.player_1.steam_nickname = P1_STEAM_NAME.clone();
 
-    new_state.player_2.steam_id = p2_steamid;
+    new_state.player_2.steam_id = format!("{}", p2_steamid);
     new_state.player_2.steam_nickname = P2_STEAM_NAME.clone();
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
