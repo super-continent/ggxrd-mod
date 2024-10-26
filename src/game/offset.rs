@@ -101,6 +101,16 @@ pub const FN_ACTIVATE_TIMER: Lazy<SigScan> = Lazy::new(|| {
     ))
 });
 
+pub const ROLLBACK_DELAY: Lazy<SigScan> = Lazy::new(|| {
+    SigScan::new_yara_style(concat!(
+        "01 00 00 00 e8 ?? ?? ?? ?? 8b ?? 8b ?? ?? ?? 64 ",
+        "89 ?? ?? ?? ?? ?? 5? 5? 5? 5? 5? 83 c? ?? c3"
+    ))
+});
+
+pub const P1_STEAMID: Offset = Offset::new(0x19A23B0);
+pub const P2_STEAMID: Offset = Offset::new(0x19A23BC);
+
 pub const GAMESTATE_PTR: Offset = Offset::new(0x198B6E4);
 
 pub const ROUNDS_TO_WIN: isize = 0x1C7240;

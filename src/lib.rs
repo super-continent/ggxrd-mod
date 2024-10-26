@@ -4,16 +4,15 @@ mod global;
 mod helpers;
 #[cfg(feature = "sammi")]
 mod sammi;
+mod steam;
 mod ui;
 
 use std::ffi::{CString, OsString};
 use std::fs::{self, File};
 
-use std::io::{Read, Write};
 use std::mem;
 use std::os::windows::ffi::OsStringExt;
 
-use std::path::PathBuf;
 use std::thread;
 
 #[macro_use]

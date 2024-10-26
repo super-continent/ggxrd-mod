@@ -1,7 +1,7 @@
 use std::{
     ffi::CStr,
     sync::atomic::{AtomicBool, Ordering},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use once_cell::sync::{Lazy, OnceCell};
@@ -12,6 +12,7 @@ use crate::{
     game::offset::*,
     global,
     helpers::{read_type, Offset},
+    steam,
 };
 
 /// The config for sammi options, taken from the full serialized rev2mod config
@@ -226,6 +227,8 @@ pub struct ObjectCreatedInfo {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PlayerState {
+    steam_id: u64,
+    steam_nickname: String,
     character: Character,
     health: usize,
     untechable_time: usize,
@@ -244,6 +247,8 @@ pub struct PlayerState {
 impl PlayerState {
     const fn new() -> Self {
         Self {
+            steam_id: 0,
+            steam_nickname: String::new(),
             character: Character::Sol,
             health: 420,
             untechable_time: 0,
@@ -399,6 +404,12 @@ fn process_string(arr: &[u8]) -> String {
 
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
+static mut P1_LAST_STEAMID: u64 = 0;
+static mut P2_LAST_STEAMID: u64 = 0;
+
+static mut P1_STEAM_NAME: String = String::new();
+static mut P2_STEAM_NAME: String = String::new();
+
 static mut CURRENT_FRAME: usize = 0;
 static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
@@ -491,6 +502,26 @@ pub unsafe fn game_loop_hook_sammi() {
     new_state.player_1.y_position = read_type::<isize>(player_1.offset(0x250));
     new_state.player_2.y_position = read_type::<isize>(player_2.offset(0x250));
 
+    log::trace!("steam player info");
+    let p1_steamid = *(P1_STEAMID.get_address() as *const u64);
+    let p2_steamid = *(P2_STEAMID.get_address() as *const u64);
+
+    if p1_steamid != P1_LAST_STEAMID && p1_steamid != 0 {
+        P1_LAST_STEAMID = p1_steamid;
+        P1_STEAM_NAME = steam::get_name_from_id(p1_steamid);
+    }
+
+    if p2_steamid != P2_LAST_STEAMID && p2_steamid != 0 {
+        P2_LAST_STEAMID = p2_steamid;
+        P2_STEAM_NAME = steam::get_name_from_id(p2_steamid);
+    }
+
+    new_state.player_1.steam_id = p1_steamid;
+    new_state.player_1.steam_nickname = P1_STEAM_NAME.clone();
+
+    new_state.player_2.steam_id = p2_steamid;
+    new_state.player_2.steam_nickname = P2_STEAM_NAME.clone();
+
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
     // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
@@ -522,11 +553,10 @@ pub unsafe fn game_loop_hook_sammi() {
         .unwrap();
     }
 
-
     let should_process_hitevent = HIT_EVENT_INFO
         .as_ref()
         .map_or(false, |event| event.current_frame < CURRENT_FRAME - 1);
-    
+
     if should_process_hitevent {
         if let Some(hit_event) = HIT_EVENT_INFO.take() {
             let attacker = hit_event.attacker;
