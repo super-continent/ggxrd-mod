@@ -503,24 +503,34 @@ pub unsafe fn game_loop_hook_sammi() {
     new_state.player_2.y_position = read_type::<isize>(player_2.offset(0x250));
 
     log::trace!("steam player info");
-    let p1_steamid = *(P1_STEAMID.get_address() as *const u64);
-    let p2_steamid = *(P2_STEAMID.get_address() as *const u64);
+    let online_info = *(ONLINE_MATCH_INFO.get_address() as *mut *mut u8);
 
-    if p1_steamid != P1_LAST_STEAMID && p1_steamid != 0 {
-        P1_LAST_STEAMID = p1_steamid;
-        P1_STEAM_NAME = steam::get_name_from_id(p1_steamid);
+    if !online_info.is_null() {
+        let p1_steamid = read_type::<u64>(online_info.offset(0xA8));
+        let p2_steamid = read_type::<u64>(online_info.offset(0xB0));
+
+        if p1_steamid != P1_LAST_STEAMID && p1_steamid != 0 {
+            P1_LAST_STEAMID = p1_steamid;
+            P1_STEAM_NAME = steam::get_name_from_id(p1_steamid);
+        }
+
+        if p2_steamid != P2_LAST_STEAMID && p2_steamid != 0 {
+            P2_LAST_STEAMID = p2_steamid;
+            P2_STEAM_NAME = steam::get_name_from_id(p2_steamid);
+        }
+
+        new_state.player_1.steam_id = format!("{}", p1_steamid);
+        new_state.player_1.steam_nickname = P1_STEAM_NAME.clone();
+
+        new_state.player_2.steam_id = format!("{}", p2_steamid);
+        new_state.player_2.steam_nickname = P2_STEAM_NAME.clone();
+    } else {
+        new_state.player_1.steam_id = String::from("0");
+        new_state.player_1.steam_nickname = String::new();
+
+        new_state.player_2.steam_id = String::from("0");
+        new_state.player_2.steam_nickname = String::new();
     }
-
-    if p2_steamid != P2_LAST_STEAMID && p2_steamid != 0 {
-        P2_LAST_STEAMID = p2_steamid;
-        P2_STEAM_NAME = steam::get_name_from_id(p2_steamid);
-    }
-
-    new_state.player_1.steam_id = format!("{}", p1_steamid);
-    new_state.player_1.steam_nickname = P1_STEAM_NAME.clone();
-
-    new_state.player_2.steam_id = format!("{}", p2_steamid);
-    new_state.player_2.steam_nickname = P2_STEAM_NAME.clone();
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 

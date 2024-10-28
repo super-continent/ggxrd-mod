@@ -108,8 +108,10 @@ pub const ROLLBACK_DELAY: Lazy<SigScan> = Lazy::new(|| {
     ))
 });
 
-pub const P1_STEAMID: Offset = Offset::new(0x19A23B0);
-pub const P2_STEAMID: Offset = Offset::new(0x19A23BC);
+pub const ONLINE_MATCH_INFO: Offset = Offset::new(0x01737FC0);
+
+pub const P1_REPLAY_STEAMID: Offset = Offset::new(0x19A23B0);
+pub const P2_REPLAY_STEAMID: Offset = Offset::new(0x19A23BC);
 
 pub const GAMESTATE_PTR: Offset = Offset::new(0x198B6E4);
 
