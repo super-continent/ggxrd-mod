@@ -110,6 +110,8 @@ player_2: PlayerState,
 Contained object types:
 ```rs
 PlayerState {
+    steam_id: String,
+    steam_nickname: String,
     character: Character,
     health: usize,
     tension_pulse: isize,
