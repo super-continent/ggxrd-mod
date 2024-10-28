@@ -38,7 +38,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
         return ui;
     }
 
-    Window::new("Rev2 Mod")
+    Window::new("Pangaea's Rev2 Mod")
         .size([300., 400.], Condition::FirstUseEver)
         .build(&ui, || {
             TabBar::new("Mods and Config").build(&ui, || {
