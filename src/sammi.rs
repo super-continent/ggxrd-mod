@@ -110,6 +110,7 @@ pub enum ObjectId {
     Projectile,
 }
 
+#[repr(u32)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Character {
     Sol = 0,
@@ -178,13 +179,13 @@ pub struct HitInfo {
     hit_type: HitType,
     was_blocked: bool,
     attack_level: u32,
-    damage: usize,
+    damage: i32,
     attacker: ObjectId,
     attacker_state: String,
     victim: ObjectId,
     victim_state: String,
     victim_previous_state: String,
-    combo_length: usize,
+    combo_length: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -230,18 +231,18 @@ pub struct PlayerState {
     steam_id: String,
     steam_nickname: String,
     character: Character,
-    health: usize,
-    untechable_time: usize,
-    tension_pulse: isize,
-    tension: isize,
-    burst: isize,
-    risc: isize,
+    health: u32,
+    untechable_time: u32,
+    tension_pulse: i32,
+    tension: u32,
+    burst: u32,
+    risc: i32,
     state: String,
     previous_state: String,
     round_wins: usize,
-    combo_counter: usize,
-    x_position: isize,
-    y_position: isize,
+    combo_counter: u32,
+    x_position: i32,
+    y_position: i32,
 }
 
 impl PlayerState {
@@ -269,8 +270,8 @@ impl PlayerState {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ComboEndInfo {
     current_frame: usize,
-    combo_length: usize,
-    combo_damage: usize,
+    combo_length: u32,
+    combo_damage: i32,
     victim: ObjectId,
     victim_state: String,
     victim_previous_state: String,
@@ -279,9 +280,9 @@ pub struct ComboEndInfo {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SammiState {
     current_frame: usize,
-    rounds_to_win: usize,
-    round_time_limit: usize,
-    round_time_left: usize,
+    rounds_to_win: u32,
+    round_time_limit: u32,
+    round_time_left: u32,
     player_1: PlayerState,
     player_2: PlayerState,
 }
@@ -426,6 +427,8 @@ pub unsafe fn game_loop_hook_sammi() {
         return;
     }
 
+    let gamestate = GameState(gamestate);
+
     CURRENT_FRAME += 1;
 
     let mut new_state = SammiState::new();
@@ -433,56 +436,49 @@ pub unsafe fn game_loop_hook_sammi() {
     // get game state
     new_state.current_frame = CURRENT_FRAME;
 
-    new_state.rounds_to_win = read_type::<usize>(gamestate.offset(ROUNDS_TO_WIN));
+    new_state.rounds_to_win = gamestate.rounds_to_win();
 
-    new_state.round_time_limit = read_type::<usize>(gamestate.offset(ROUND_TIME_LIMIT));
-    new_state.round_time_left = read_type::<usize>(gamestate.offset(ROUND_TIME_LEFT));
-
-    // get player state
-    let player_1 = gamestate.offset(P1_OFFSET);
-    let player_2 = gamestate.offset(P2_OFFSET);
+    new_state.round_time_limit = gamestate.round_time_limit();
+    new_state.round_time_left = gamestate.round_time_left();
 
     new_state.player_1.character =
-        Character::from_number(read_type::<usize>(player_1.offset(0x44)));
+        Character::from_number(gamestate.player_1().character() as usize);
     new_state.player_2.character =
-        Character::from_number(read_type::<usize>(player_2.offset(0x44)));
+        Character::from_number(gamestate.player_2().character() as usize);
 
     log::trace!("Collecting state data");
 
     // max with 0 and usize conversion ensures 0..MAX range
     log::trace!("health");
-    new_state.player_1.health = read_type::<isize>(player_1.offset(0x9CC)).max(0) as usize;
-    new_state.player_2.health = read_type::<isize>(player_2.offset(0x9CC)).max(0) as usize;
+    new_state.player_1.health = gamestate.player_1().health().max(0) as u32;
+    new_state.player_2.health = gamestate.player_2().health().max(0) as u32;
 
     log::trace!("tension pulse");
-    new_state.player_1.tension_pulse = read_type::<isize>(player_1.offset(0x2D128));
-    new_state.player_2.tension_pulse = read_type::<isize>(player_2.offset(0x2D128));
+    new_state.player_1.tension_pulse = gamestate.player_1().tension_pulse();
+    new_state.player_2.tension_pulse = gamestate.player_2().tension_pulse();
 
     log::trace!("untechable time");
-    new_state.player_1.untechable_time = read_type::<usize>(player_1.offset(0x9808));
-    new_state.player_2.untechable_time = read_type::<usize>(player_2.offset(0x9808));
-
+    new_state.player_1.untechable_time = gamestate.player_1().untechable_time();
+    new_state.player_2.untechable_time = gamestate.player_2().untechable_time();
     log::trace!("tension meter");
-    new_state.player_1.tension = read_type::<isize>(player_1.offset(0x2D134));
-    new_state.player_2.tension = read_type::<isize>(player_2.offset(0x2D134));
+    new_state.player_1.tension = gamestate.player_1().tension_meter();
+    new_state.player_2.tension = gamestate.player_2().tension_meter();
 
     log::trace!("burst meter");
-    new_state.player_1.burst = read_type::<isize>(gamestate.offset(BURST_P1));
-    new_state.player_2.burst = read_type::<isize>(gamestate.offset(BURST_P2));
+    new_state.player_1.burst = gamestate.burst_meter_p1();
+    new_state.player_2.burst = gamestate.burst_meter_p2();
 
     log::trace!("risc");
-    new_state.player_1.risc = read_type::<isize>(player_1.offset(0x24E30));
-    new_state.player_2.risc = read_type::<isize>(player_2.offset(0x24E30));
+    new_state.player_1.risc = gamestate.player_1().risc_meter();
+    new_state.player_2.risc = gamestate.player_2().risc_meter();
 
     log::trace!("current state");
-    new_state.player_1.state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
-    new_state.player_2.state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
+    new_state.player_1.state = process_string(&gamestate.player_1().current_state());
+    new_state.player_2.state = process_string(&gamestate.player_2().previous_state());
 
     log::trace!("previous state");
-    new_state.player_1.previous_state =
-        process_string(&read_type::<[u8; 32]>(player_1.offset(0x2424)));
-    new_state.player_2.previous_state =
-        process_string(&read_type::<[u8; 32]>(player_2.offset(0x2424)));
+    new_state.player_1.previous_state = process_string(&gamestate.player_1().previous_state());
+    new_state.player_2.previous_state = process_string(&gamestate.player_2().previous_state());
 
     log::trace!("round wins");
     new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
@@ -491,16 +487,16 @@ pub unsafe fn game_loop_hook_sammi() {
     // combo counters are actually held inside the opponent,
     // so we switch them to make the data easier to understand
     log::trace!("combo counter");
-    new_state.player_1.combo_counter = read_type::<usize>(player_2.offset(0x9F28));
-    new_state.player_2.combo_counter = read_type::<usize>(player_1.offset(0x9F28));
+    new_state.player_1.combo_counter = gamestate.player_2().recieved_combo_counter();
+    new_state.player_2.combo_counter = gamestate.player_1().recieved_combo_counter();
 
     log::trace!("X position");
-    new_state.player_1.x_position = read_type::<isize>(player_1.offset(0x24C));
-    new_state.player_2.x_position = read_type::<isize>(player_2.offset(0x24C));
+    new_state.player_1.x_position = gamestate.player_1().x_position();
+    new_state.player_2.x_position = gamestate.player_2().x_position();
 
     log::trace!("Y position");
-    new_state.player_1.y_position = read_type::<isize>(player_1.offset(0x250));
-    new_state.player_2.y_position = read_type::<isize>(player_2.offset(0x250));
+    new_state.player_1.y_position = gamestate.player_1().y_position();
+    new_state.player_2.y_position = gamestate.player_2().y_position();
 
     log::trace!("steam player info");
     let online_info = *(ONLINE_MATCH_INFO.get_address() as *mut *mut u8);
@@ -569,26 +565,25 @@ pub unsafe fn game_loop_hook_sammi() {
 
     if should_process_hitevent {
         if let Some(hit_event) = HIT_EVENT_INFO.take() {
-            let attacker = hit_event.attacker;
-            let victim = hit_event.victim;
+            let attacker = GameObject(hit_event.attacker);
+            let victim = GameObject(hit_event.victim);
 
-            let mut hit_type = match read_type::<usize>(victim.offset(0x990)) {
+            let mut hit_type = match victim.recieved_hit_type() {
                 0 => HitType::Normal,
                 2 => HitType::Counter,
                 3 => HitType::MortalCounter,
                 _ => HitType::Unknown,
             };
 
-            let combo_length = read_type::<usize>(victim.offset(0x9F28));
-            let damage = read_type::<usize>(victim.offset(0x9F48));
+            let combo_length = victim.recieved_combo_counter();
+            let damage = victim.recieved_damage();
             let mut was_blocked = combo_length == 0;
 
-            let victim_state = process_string(&read_type::<[u8; 32]>(victim.offset(0x2444)));
-            let victim_previous_state =
-                process_string(&read_type::<[u8; 32]>(victim.offset(0x2424)));
+            let victim_state = process_string(&victim.current_state());
+            let victim_previous_state = process_string(&victim.previous_state());
 
-            let attacker_state = process_string(&read_type::<[u8; 32]>(attacker.offset(0x2444)));
-            let attack_lvl = read_type::<u32>(attacker.offset(0x450));
+            let attacker_state = process_string(&attacker.current_state());
+            let attack_lvl = attacker.attack_level();
 
             // throw detection:
             // since proximity throws connect on frame 1 (earlier than any other move in the game)
@@ -659,12 +654,11 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
-    let player_1 = gamestate.offset(P1_OFFSET);
-    let player_2 = gamestate.offset(P2_OFFSET);
+    let gamestate = GameState(gamestate);
 
-    let created_by = if object == player_1 {
+    let created_by = if object == gamestate.player_1().0 {
         ObjectId::Player1
-    } else if object == player_2 {
+    } else if object == gamestate.player_2().0 {
         ObjectId::Player2
     } else {
         ObjectId::Projectile
@@ -677,8 +671,8 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
         return;
     }
 
-    let player1_state = process_string(&read_type::<[u8; 32]>(player_1.offset(0x2444)));
-    let player2_state = process_string(&read_type::<[u8; 32]>(player_2.offset(0x2444)));
+    let player1_state = process_string(&gamestate.player_1().current_state());
+    let player2_state = process_string(&gamestate.player_2().current_state());
 
     let object_created_info = ObjectCreatedInfo {
         current_frame: CURRENT_FRAME,
@@ -700,27 +694,28 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
         return;
     }
 
+    let object = GameObject(object);
+
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
-    let player_1 = gamestate.offset(P1_OFFSET);
-    let player_2 = gamestate.offset(P2_OFFSET);
+    let gamestate = GameState(gamestate);
 
-    let combo_length = read_type::<usize>(object.offset(0x9F28));
+    let combo_length = object.recieved_combo_counter();
 
     if combo_length == 0 {
         return;
     }
 
-    let victim = if object == player_1 {
+    let victim = if object.0 == gamestate.player_1().0 {
         ObjectId::Player1
-    } else if object == player_2 {
+    } else if object.0 == gamestate.player_2().0 {
         ObjectId::Player2
     } else {
         return;
     };
 
-    let victim_state = process_string(&read_type::<[u8; 32]>(object.offset(0x2444)));
-    let victim_previous_state = process_string(&read_type::<[u8; 32]>(object.offset(0x2424)));
+    let victim_state = process_string(&object.current_state());
+    let victim_previous_state = process_string(&object.previous_state());
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
@@ -730,7 +725,7 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
         victim_state,
         victim_previous_state,
         combo_length,
-        combo_damage: read_type::<usize>(object.offset(0x9F44)),
+        combo_damage: object.recieved_combo_damage(),
     }))
     .unwrap();
 }
@@ -755,18 +750,23 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
 
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
-    let victim_id = if gamestate.offset(P1_OFFSET) == victim {
+    let gamestate = GameState(gamestate);
+
+    let victim = GameObject(victim);
+    let attacker = GameObject(attacker);
+
+    let victim_id = if gamestate.player_1().0 == victim.0 {
         ObjectId::Player1
-    } else if gamestate.offset(P2_OFFSET) == victim {
+    } else if gamestate.player_2().0 == victim.0 {
         ObjectId::Player2
     } else {
         // dont handle anything except for the players being hit
         return;
     };
 
-    let attacker_id = if gamestate.offset(P1_OFFSET) == attacker {
+    let attacker_id = if gamestate.player_1().0 == attacker.0 {
         ObjectId::Player1
-    } else if gamestate.offset(P2_OFFSET) == attacker {
+    } else if gamestate.player_2().0 == attacker.0 {
         ObjectId::Player2
     } else {
         ObjectId::Projectile
@@ -774,9 +774,9 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
 
     HIT_EVENT_INFO = Some(HitEventInfoInternal {
         current_frame: CURRENT_FRAME,
-        attacker,
+        attacker: attacker.0,
         attacker_id,
-        victim,
+        victim: victim.0,
         victim_id,
     })
 }

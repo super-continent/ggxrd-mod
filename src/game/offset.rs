@@ -3,6 +3,7 @@ use once_cell::sync::Lazy;
 ///! Offsets and AOB scan patterns to locate certain function in Xrd
 use sigscan::SigScan;
 
+use crate::helpers::offset_struct;
 use crate::helpers::Offset;
 
 /// BattleState::ControlBattleObject(state *)
@@ -115,15 +116,45 @@ pub const P2_REPLAY_STEAMID: Offset = Offset::new(0x19A23BC);
 
 pub const GAMESTATE_PTR: Offset = Offset::new(0x198B6E4);
 
-pub const ROUNDS_TO_WIN: isize = 0x1C7240;
-
-pub const ROUND_TIME_LIMIT: isize = 0x1C71FC;
-pub const ROUND_TIME_LEFT: isize = 0x1C7200;
-
-pub const BURST_P1: isize = 0x1C4B20;
-pub const BURST_P2: isize = 0x1C4B24;
-
 /// `[GAMESTATE_PTR]` offset to player 1
 pub const P1_OFFSET: isize = 0x169814;
 /// `[GAMESTATE_PTR]` offset to player 2
 pub const P2_OFFSET: isize = 0x169814 + 0x2D198;
+
+offset_struct! {
+    struct GameState {
+        rounds_to_win @ 0x1C7240: u32,
+        round_time_limit @ 0x1C71FC: u32,
+        round_time_left @ 0x1C7200: u32,
+        burst_meter_p1 @ 0x1C4B20: u32,
+        burst_meter_p2 @ 0x1C4B24: u32,
+    }
+
+    struct GameObject {
+        character @ 0x44: u32,
+        x_position @ 0x24C: i32,
+        y_position @ 0x250: i32,
+        attack_level @ 0x450: u32,
+        recieved_hit_type @ 0x990: u32,
+        health @ 0x9CC: i32,
+        previous_state @ 0x2424: [u8; 32],
+        current_state @ 0x2444: [u8; 32],
+        untechable_time @ 0x9808: u32,
+        recieved_combo_counter @ 0x9F28: u32,
+        recieved_combo_damage @ 0x9F44: i32,
+        recieved_damage @ 0x9F48: i32,
+        tension_pulse @ 0x2D128: i32,
+        tension_meter @ 0x2D134: u32,
+        risc_meter @ 0x24E30: i32,
+    }
+}
+
+impl GameState {
+    pub unsafe fn player_1(&self) -> GameObject {
+        GameObject(self.0.offset(P1_OFFSET))
+    }
+
+    pub unsafe fn player_2(&self) -> GameObject {
+        GameObject(self.0.offset(P2_OFFSET))
+    }
+}

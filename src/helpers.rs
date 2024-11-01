@@ -42,6 +42,22 @@ pub unsafe fn read_type<T: Sized>(ptr: *mut u8) -> T {
     ptr.read()
 }
 
+pub unsafe fn write_type<T: Sized>(ptr: *mut T, val: T) {
+    let _guard = match region::protect_with_handle(
+        ptr,
+        size_of::<T>(),
+        region::Protection::READ_WRITE_EXECUTE,
+    ) {
+        Ok(guard) => guard,
+        Err(e) => {
+            log::error!("error protecting memory: {}", e);
+            return;
+        }
+    };
+
+    ptr.write(val);
+}
+
 pub unsafe fn set_window_long_ptr(hwnd: HWND, index: c_int, new_long: i32) -> i32 {
     match IsWindowUnicode(hwnd) {
         0 => SetWindowLongPtrA(hwnd, index, new_long),
@@ -144,3 +160,25 @@ pub fn get_subfolder_names(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBu
         .collect();
     Ok(paths)
 }
+
+macro_rules! offset_struct {
+    ($(struct $type_name:ident {
+        $($field_name:ident @ $offset:literal: $field_type:ty),* $(,)?
+    })+)  => {
+        $(
+            #[repr(transparent)]
+            pub struct $type_name(pub *mut u8);
+
+            impl $type_name {
+                $(
+                    pub unsafe fn $field_name(&self) -> $field_type {
+                        let ptr = self.0.offset($offset) as *mut $field_type;
+                        ptr.read_unaligned()
+                    }
+                )*
+            }
+        )+
+    };
+}
+
+pub(crate) use offset_struct;
