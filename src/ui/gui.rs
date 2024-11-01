@@ -1,3 +1,5 @@
+use crate::game::offset::GameState;
+use crate::game::offset::GAMESTATE_PTR;
 use crate::global;
 use crate::sammi;
 
@@ -105,6 +107,32 @@ pub fn ui_loop(ui: Ui) -> Ui {
                 TabItem::new("Help").build(&ui, || ui.bullet_text("F1: Show/Hide menu"));
             })
         });
+
+    unsafe {
+        let gamestate = unsafe { *(GAMESTATE_PTR.get_address() as *mut *mut u8) };
+
+        if gamestate.is_null() {
+            return ui;
+        }
+
+        let gamestate = GameState(gamestate);
+
+        Window::new("Game State").build(&ui, || {
+            ui.text("P1 Tension Pulse");
+            ProgressBar::new(
+                (gamestate.player_1().tension_pulse() as f32 + 25000.0) / (25000.0 + 25000.0),
+            )
+            .overlay_text(format!("{}/25000", gamestate.player_1().tension_pulse()))
+            .build(&ui);
+
+            ui.text("P2 Tension Pulse");
+            ProgressBar::new(
+                (gamestate.player_2().tension_pulse() as f32 + 25000.0) / (25000.0 + 25000.0),
+            )
+            .overlay_text(format!("{}/25000", gamestate.player_2().tension_pulse()))
+            .build(&ui);
+        });
+    }
 
     ui
 }
