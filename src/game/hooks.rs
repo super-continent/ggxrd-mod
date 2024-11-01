@@ -93,10 +93,12 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         let process_hit = make_fn!(get_aob_offset(&offset::FN_PROCESS_HIT).unwrap() => unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8));
 
         log::debug!("process_hit: {:X}", process_hit as usize);
-        ProcessHitHook.initialize(process_hit, |attacker, victim, unknown| {
-            ProcessHitHook.call(attacker, victim, unknown);
-            sammi::process_hit_hook(attacker, victim);
-        })?.enable()?;
+        ProcessHitHook
+            .initialize(process_hit, |attacker, victim, unknown| {
+                ProcessHitHook.call(attacker, victim, unknown);
+                sammi::process_hit_hook(attacker, victim);
+            })?
+            .enable()?;
     }
     Ok(())
 }

@@ -460,6 +460,7 @@ pub unsafe fn game_loop_hook_sammi() {
     log::trace!("untechable time");
     new_state.player_1.untechable_time = gamestate.player_1().untechable_time();
     new_state.player_2.untechable_time = gamestate.player_2().untechable_time();
+
     log::trace!("tension meter");
     new_state.player_1.tension = gamestate.player_1().tension_meter();
     new_state.player_2.tension = gamestate.player_2().tension_meter();
