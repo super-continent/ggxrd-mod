@@ -119,6 +119,7 @@ PlayerState {
     tension: isize,
     burst: isize,
     risc: isize,
+    stun: isize
     state: String,
     previous_state: String,
     round_wins: usize,
