@@ -144,6 +144,7 @@ offset_struct! {
         recieved_combo_damage @ 0x9F44: i32,
         recieved_damage @ 0x9F48: i32,
         stun @ 0x9FC4: i32,
+        stun_resistance @ 0x9FC8: u32,
         tension_pulse @ 0x2D128: i32,
         tension_meter @ 0x2D134: u32,
         risc_meter @ 0x24E30: i32,

@@ -238,6 +238,7 @@ pub struct PlayerState {
     burst: u32,
     risc: i32,
     stun: i32,
+    stun_resistance: u32,
     state: String,
     previous_state: String,
     round_wins: usize,
@@ -259,6 +260,7 @@ impl PlayerState {
             burst: 0,
             risc: 0,
             stun: 0,
+            stun_resistance: 0,
             state: String::new(),
             previous_state: String::new(),
             round_wins: 0,
@@ -478,6 +480,10 @@ pub unsafe fn game_loop_hook_sammi() {
     log::trace!("stun");
     new_state.player_1.stun = gamestate.player_1().stun();
     new_state.player_2.stun = gamestate.player_2().stun();
+
+    log::trace!("stun resistance");
+    new_state.player_1.stun_resistance = gamestate.player_1().stun_resistance();
+    new_state.player_2.stun_resistance = gamestate.player_2().stun_resistance();
 
     log::trace!("current state");
     new_state.player_1.state = process_string(&gamestate.player_1().current_state());
