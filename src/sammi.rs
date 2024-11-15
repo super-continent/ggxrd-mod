@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::offset::*,
-    global::{self, MESSAGE_SENDER},
+    global,
     helpers::{read_type, Offset},
     steam,
 };
@@ -632,7 +632,7 @@ pub unsafe fn game_loop_hook_sammi() {
                 attacker_state,
                 victim_state,
                 victim_previous_state,
-                combo_length: combo_length,
+                combo_length,
             }))
             .unwrap();
         }

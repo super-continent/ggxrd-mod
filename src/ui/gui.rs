@@ -57,7 +57,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
                     let items = global::MOD_SUBFOLDERS.lock();
 
                     // function to make argument and return type share the lifetime
-                    fn folder_label_fn<'b>(p: &'b Option<PathBuf>) -> Cow<'b, str> {
+                    fn folder_label_fn(p: &Option<PathBuf>) -> Cow<'_, str> {
                         match p {
                             Some(ref path) => path.to_string_lossy(),
                             None => "Root Folder".into(),
@@ -109,7 +109,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
         });
 
     unsafe {
-        let gamestate = unsafe { *(GAMESTATE_PTR.get_address() as *mut *mut u8) };
+        let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
         if gamestate.is_null() {
             return ui;

@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::{ffi::OsStr, mem};
 
 use sigscan::SigScan;
-use winapi::um::memoryapi::ReadProcessMemory;
 use winapi::um::psapi::{GetModuleInformation, MODULEINFO};
 use winapi::{
     ctypes::c_int,

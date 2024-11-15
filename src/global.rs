@@ -28,7 +28,7 @@ fn init_config() -> ModConfig {
             Err(e) => error!("{}", e),
         };
 
-        return ModConfig::default();
+        ModConfig::default()
     } else {
         match File::open(&config_path) {
             Ok(mut f) => {
@@ -48,7 +48,7 @@ fn init_config() -> ModConfig {
             Err(e) => error!("{}", e),
         };
 
-        return ModConfig::default();
+        ModConfig::default()
     }
 }
 
@@ -56,9 +56,9 @@ pub static CONFIG: GlobalMut<ModConfig> = Lazy::new(|| Mutex::new(init_config())
 
 pub static MOD_SUBFOLDERS: GlobalMut<Vec<Option<PathBuf>>> = Lazy::new(|| {
     let mut paths: Vec<Option<PathBuf>> = helpers::get_subfolder_names(DEFAULT_MODS_FOLDER)
-        .unwrap_or(Vec::new())
+        .unwrap_or_default()
         .into_iter()
-        .map(|p| Some(p))
+        .map(Some)
         .collect();
 
     paths.insert(0, None);
