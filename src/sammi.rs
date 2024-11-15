@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::offset::*,
-    global,
+    global::{self, MESSAGE_SENDER},
     helpers::{read_type, Offset},
     steam,
 };
@@ -30,6 +30,7 @@ pub enum SammiMessage {
     RoundStart,
     RoundEnd(RoundEndInfo),
     ComboEnd(ComboEndInfo),
+    StateDeInitialized,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -398,6 +399,16 @@ pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) 
                     config.timeout.abs() * 2.0,
                 );
             }
+            SammiMessage::StateDeInitialized => {
+                let new_agent = agent.clone();
+
+                send_event(
+                    new_agent,
+                    "ggxrd_gamestateDeinitialized".into(),
+                    "{}".into(),
+                    config.timeout.abs() * 2.0,
+                );
+            }
         };
     }
 }
@@ -427,7 +438,7 @@ pub unsafe fn game_loop_hook_sammi() {
         return;
     }
 
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -476,7 +487,7 @@ pub unsafe fn game_loop_hook_sammi() {
     log::trace!("risc");
     new_state.player_1.risc = gamestate.player_1().risc_meter();
     new_state.player_2.risc = gamestate.player_2().risc_meter();
-    
+
     log::trace!("stun");
     new_state.player_1.stun = gamestate.player_1().stun();
     new_state.player_2.stun = gamestate.player_2().stun();
@@ -544,13 +555,13 @@ pub unsafe fn game_loop_hook_sammi() {
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
     // check ROUND_OVER to ensure RoundEnd isnt sent more than once per round
-    let round_over = ROUND_OVER.load(std::sync::atomic::Ordering::SeqCst);
+    let round_over = ROUND_OVER.load(Ordering::SeqCst);
     if !round_over
         && (new_state.round_time_left == 0
             || new_state.player_1.health <= 0
             || new_state.player_2.health <= 0)
     {
-        ROUND_OVER.store(true, std::sync::atomic::Ordering::SeqCst);
+        ROUND_OVER.store(true, Ordering::SeqCst);
         let winner = if new_state.player_1.health > new_state.player_2.health {
             Winner::Player1
         } else if new_state.player_1.health < new_state.player_2.health {
@@ -648,7 +659,7 @@ pub unsafe fn game_loop_hook_sammi() {
 }
 
 pub unsafe fn round_begin() {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -661,7 +672,7 @@ pub unsafe fn round_begin() {
 }
 
 pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *mut u8) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -703,7 +714,7 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
 // Must be called BEFORE the actual function runs and resets state.
 pub unsafe fn end_combo_hook(object: *mut u8) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed) {
+    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -754,10 +765,7 @@ struct HitEventInfoInternal {
 static mut HIT_EVENT_INFO: Option<HitEventInfoInternal> = None;
 
 pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
-    if !SAMMI_ENABLED.load(std::sync::atomic::Ordering::Relaxed)
-        || attacker.is_null()
-        || victim.is_null()
-    {
+    if !SAMMI_ENABLED.load(Ordering::Relaxed) || attacker.is_null() || victim.is_null() {
         return;
     }
 
@@ -792,4 +800,23 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
         victim: victim.0,
         victim_id,
     })
+}
+
+pub unsafe fn deinit_gamestate_hook() {
+    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
+
+    let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
+
+    // only send if the state is actually being deleted
+    if gamestate.is_null() {
+        return;
+    }
+
+    ROUND_OVER.store(true, Ordering::SeqCst);
+
+    let tx = global::MESSAGE_SENDER.get().unwrap().clone();
+
+    tx.blocking_send(SammiMessage::StateDeInitialized).unwrap();
 }

@@ -26,6 +26,7 @@ static_detour! {
     static EndComboHook: unsafe extern "thiscall" fn (*mut u8);
     static ActivateTimerHook: unsafe extern "thiscall" fn (*mut u8);
     static ProcessHitHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
+    static DeInitGameStateHook: unsafe extern "C" fn ();
 }
 
 static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
@@ -97,6 +98,16 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
             .initialize(process_hit, |attacker, victim, unknown| {
                 ProcessHitHook.call(attacker, victim, unknown);
                 sammi::process_hit_hook(attacker, victim);
+            })?
+            .enable()?;
+
+        let deinit_gamestate = make_fn!(get_aob_offset(&offset::FN_DEINIT_GAMESTATE).unwrap() => unsafe extern "C" fn ());
+        log::debug!("deinitialize_gamestate: {:X}", deinit_gamestate as usize);
+
+        DeInitGameStateHook
+            .initialize(deinit_gamestate, || {
+                sammi::deinit_gamestate_hook();
+                DeInitGameStateHook.call()
             })?
             .enable()?;
     }

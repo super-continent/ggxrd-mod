@@ -184,3 +184,10 @@ victim: ObjectId,
 victim_state: String,
 victim_previous_state: String,
 ```
+
+### `ggxrd_gamestateDeinitialized`
+
+Triggers when the games battle state is being freed from memory,
+to help track things like matches being exited early.
+
+Currently contains no data.
