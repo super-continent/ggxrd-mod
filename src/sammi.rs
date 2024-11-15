@@ -487,7 +487,7 @@ pub unsafe fn game_loop_hook_sammi() {
 
     log::trace!("current state");
     new_state.player_1.state = process_string(&gamestate.player_1().current_state());
-    new_state.player_2.state = process_string(&gamestate.player_2().previous_state());
+    new_state.player_2.state = process_string(&gamestate.player_2().current_state());
 
     log::trace!("previous state");
     new_state.player_1.previous_state = process_string(&gamestate.player_1().previous_state());
