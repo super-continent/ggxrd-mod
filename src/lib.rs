@@ -53,7 +53,7 @@ pub unsafe extern "stdcall" fn DllMain(
                     .build()
                     .unwrap();
                 runtime.block_on(async move {
-                    sammi::message_handler(rx).await;
+                    sammi::start_websocket_server(rx).await;
                 });
             });
         } else {

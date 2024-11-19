@@ -39,6 +39,8 @@ dashmap = "5.3"
 once_cell = { version = "1.13", features = ["parking_lot"] }
 region = "3.0.0"
 serde_json = { version = "1.0.120", optional = true }
-tokio = { version = "1.39.1", features = ["rt", "sync"], optional = true }
+tokio = { version = "1.39.1", features = ["rt", "sync", "macros"], optional = true }
 reqwest = { version = "0.12.5", optional = true }
 steamworks-sys = "0.11.0"
+tokio-tungstenite = "0.24.0"
+futures-util = "0.3.31"
