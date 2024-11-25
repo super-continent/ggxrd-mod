@@ -264,6 +264,10 @@ pub struct PlayerState {
     combo_counter: u32,
     x_position: i32,
     y_position: i32,
+    character_resource_1: i32,
+    character_resource_2: i32,
+    character_resource_3: i32,
+    character_resource_4: i32,
 }
 
 impl PlayerState {
@@ -286,6 +290,10 @@ impl PlayerState {
             combo_counter: 0,
             x_position: 0,
             y_position: 0,
+            character_resource_1: 0,
+            character_resource_2: 0,
+            character_resource_3: 0,
+            character_resource_4: 0,
         }
     }
 }
@@ -510,6 +518,17 @@ pub unsafe fn game_loop_hook_sammi() {
     log::trace!("Y position");
     new_state.player_1.y_position = gamestate.player_1().y_position();
     new_state.player_2.y_position = gamestate.player_2().y_position();
+
+    log::trace!("resource slots");
+    new_state.player_1.character_resource_1 = gamestate.player_1().resource_1();
+    new_state.player_1.character_resource_2 = gamestate.player_1().resource_2();
+    new_state.player_1.character_resource_3 = gamestate.player_1().resource_3();
+    new_state.player_1.character_resource_4 = gamestate.player_1().resource_4();
+
+    new_state.player_2.character_resource_1 = gamestate.player_2().resource_1();
+    new_state.player_2.character_resource_2 = gamestate.player_2().resource_2();
+    new_state.player_2.character_resource_3 = gamestate.player_2().resource_3();
+    new_state.player_2.character_resource_4 = gamestate.player_2().resource_4();
 
     log::trace!("steam player info");
     let online_info = *(ONLINE_MATCH_INFO.get_address() as *mut *mut u8);

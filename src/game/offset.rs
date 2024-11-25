@@ -157,6 +157,10 @@ offset_struct! {
         tension_pulse @ 0x2D128: i32,
         tension_meter @ 0x2D134: u32,
         risc_meter @ 0x24E30: i32,
+        resource_1 @ 0x24CCC: i32,
+        resource_2 @ 0x24CF0: i32,
+        resource_3 @ 0x24D14: i32,
+        resource_4 @ 0x24D5C: i32,
     }
 }
 
