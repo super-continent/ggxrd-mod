@@ -1,6 +1,7 @@
 use crate::game::offset::GameState;
 use crate::game::offset::GAMESTATE_PTR;
 use crate::global;
+#[cfg(feature = "sammi")]
 use crate::sammi;
 
 use std::borrow::Cow;

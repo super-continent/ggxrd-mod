@@ -42,7 +42,8 @@ pub unsafe extern "stdcall" fn DllMain(
 
     if attach_reason == DLL_PROCESS_ATTACH {
         // if sammi is used we set up the message passing state
-        if cfg!(feature = "sammi") {
+        #[cfg(feature = "sammi")]
+        {
             let (tx, rx) = tokio::sync::mpsc::channel(8);
             global::MESSAGE_SENDER.get_or_init(move || tx);
             thread::spawn(|| unsafe { initialize() });
@@ -56,7 +57,9 @@ pub unsafe extern "stdcall" fn DllMain(
                     sammi::start_websocket_server(rx).await;
                 });
             });
-        } else {
+        }
+        #[cfg(not(feature = "sammi"))]
+        {
             thread::spawn(|| unsafe { initialize() });
         }
     };

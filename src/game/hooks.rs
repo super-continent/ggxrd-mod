@@ -2,7 +2,10 @@ use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::game::get_script_filename;
 use crate::global::GlobalMut;
 use crate::helpers::get_aob_offset;
-use crate::{global, make_fn, sammi};
+use crate::{global, make_fn};
+
+#[cfg(feature = "sammi")]
+use crate::sammi;
 
 use std::ffi::CStr;
 use std::ptr;
@@ -121,7 +124,8 @@ unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
         other as usize,
     );
 
-    if cfg!(feature = "sammi") {
+    #[cfg(feature = "sammi")]
+    {
         log::trace!("gathering state for sammi...");
         crate::sammi::game_loop_hook_sammi();
     }

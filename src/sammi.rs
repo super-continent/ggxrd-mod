@@ -4,12 +4,10 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
 };
 
 use futures_util::SinkExt;
 use once_cell::sync::{Lazy, OnceCell};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::{
     net::TcpListener,
@@ -394,114 +392,6 @@ pub async fn message_handler(mut rx: mpsc::Receiver<SammiMessage>, clients: Clie
         }
 
         *locked_clients = active_clients;
-    }
-}
-
-/// Message handler that sends data via webhook
-pub async fn webhook_message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) {
-    let config = SAMMI_CONFIG.get().unwrap();
-    let agent = reqwest::Client::new();
-
-    let send_event = |agent: Client, event_name: String, custom_data: String, timeout: f32| {
-        tokio::spawn(async move {
-            let start_time = std::time::Instant::now();
-            let res = agent
-                .post(&config.webhook_url)
-                .timeout(Duration::from_secs_f32(timeout))
-                .body(format!(
-                    "{{
-                        'trigger': '{event_name}',
-                        'eventInfo': {custom_data}
-                    }}"
-                ))
-                .send()
-                .await;
-            let duration = start_time.elapsed();
-            log::trace!("Request took: {:?}", duration);
-            log::trace!("Response to {}: {:?}", event_name, res);
-        })
-    };
-
-    while let Some(message) = rx.recv().await {
-        match message {
-            SammiMessage::UpdateState(val) => {
-                let new_agent = agent.clone();
-                let val = serde_json::ser::to_string(&val).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_stateUpdate".into(),
-                    val,
-                    // timeout multiplied by 2 for other cases to ensure state updates timeout first
-                    config.timeout.abs(),
-                );
-            }
-            SammiMessage::PlayerHit(info) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&info).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_hitEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::ObjectCreated(name) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&name).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_objectCreatedEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::RoundStart => {
-                let new_agent = agent.clone();
-
-                // no roundstart info
-                send_event(
-                    new_agent,
-                    "ggxrd_roundStartEvent".into(),
-                    "{}".into(),
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::RoundEnd(info) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&info).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_roundEndEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::ComboEnd(info) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&info).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_comboEndEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::StateDeInitialized => {
-                let new_agent = agent.clone();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_gamestateDeinitialized".into(),
-                    "{}".into(),
-                    config.timeout.abs() * 2.0,
-                );
-            }
-        };
     }
 }
 
