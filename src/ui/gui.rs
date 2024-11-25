@@ -97,8 +97,6 @@ pub fn ui_loop(ui: Ui) -> Ui {
                     {
                         ui.checkbox("Enable SAMMI", &mut config.sammi.sammi_enabled);
                         sammi::SAMMI_ENABLED.store(config.sammi.sammi_enabled, Ordering::Relaxed);
-                        ui.input_text("Webhook URL", &mut config.sammi.webhook_url)
-                            .build();
                     }
                     if ui.button("Save Config") {
                         save_config(config.clone())
