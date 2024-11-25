@@ -43,7 +43,6 @@ pub enum SammiMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SammiConfig {
     pub sammi_enabled: bool,
-    pub webhook_url: String,
     pub websocket_ip: String,
     pub websocket_port: u16,
     pub state_update_hz: f32,
@@ -55,10 +54,9 @@ impl Default for SammiConfig {
     fn default() -> Self {
         Self {
             sammi_enabled: true,
-            webhook_url: "http://127.0.0.1:9450/webhook".into(),
             websocket_ip: "0.0.0.0".into(),
             websocket_port: 6651,
-            state_update_hz: 25.0,
+            state_update_hz: 60.0,
             timeout: 0.1,
             developer_data: SammiDevConfig::default(),
         }
