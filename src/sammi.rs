@@ -1,12 +1,19 @@
 use std::{
     ffi::CStr,
-    sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
+use futures_util::SinkExt;
 use once_cell::sync::{Lazy, OnceCell};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tokio::{
+    net::TcpListener,
+    sync::{mpsc, Mutex},
+};
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
     game::offset::*,
@@ -37,6 +44,8 @@ pub enum SammiMessage {
 pub struct SammiConfig {
     pub sammi_enabled: bool,
     pub webhook_url: String,
+    pub websocket_ip: String,
+    pub websocket_port: u16,
     pub state_update_hz: f32,
     pub timeout: f32,
     pub developer_data: SammiDevConfig,
@@ -47,6 +56,8 @@ impl Default for SammiConfig {
         Self {
             sammi_enabled: true,
             webhook_url: "http://127.0.0.1:9450/webhook".into(),
+            websocket_ip: "0.0.0.0".into(),
+            websocket_port: 6651,
             state_update_hz: 25.0,
             timeout: 0.1,
             developer_data: SammiDevConfig::default(),
@@ -305,111 +316,82 @@ impl SammiState {
     }
 }
 
-/// Message handler loop which is spawned in a separate thread
-pub async fn message_handler(mut rx: tokio::sync::mpsc::Receiver<SammiMessage>) {
+type Clients = Arc<Mutex<Vec<tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>>>>;
+
+pub async fn start_websocket_server(rx: mpsc::Receiver<SammiMessage>) {
     let config = SAMMI_CONFIG.get().unwrap();
-    let agent = reqwest::Client::new();
 
-    let send_event = |agent: Client, event_name: String, custom_data: String, timeout: f32| {
-        tokio::spawn(async move {
-            let start_time = std::time::Instant::now();
-            let res = agent
-                .post(&config.webhook_url)
-                .timeout(Duration::from_secs_f32(timeout))
-                .body(format!(
-                    "{{
-                        'trigger': '{event_name}',
-                        'eventInfo': {custom_data}
-                    }}"
-                ))
-                .send()
-                .await;
-            let duration = start_time.elapsed();
-            log::trace!("Request took: {:?}", duration);
-            log::trace!("Response to {}: {:?}", event_name, res);
-        })
-    };
+    let addr = format!("{}:{}", config.websocket_ip, config.websocket_port);
+    let listener = TcpListener::bind(&addr)
+        .await
+        .expect("failed to bind WebSocket server");
+    let clients: Clients = Arc::new(Mutex::new(Vec::new()));
 
+    // task to accept and add connections to the client list
+    let accept_handle = tokio::spawn(accept_connections(listener, clients.clone()));
+
+    // handle messages and send the data to clients in the list
+    let message_handle = tokio::spawn(message_handler(rx, clients));
+
+    log::debug!("WebSocket server running at {}", addr);
+
+    tokio::try_join!(accept_handle, message_handle).expect("error in sammi tasks");
+}
+
+async fn accept_connections(listener: TcpListener, clients: Clients) {
+    loop {
+        while let Ok((stream, _)) = listener.accept().await {
+            log::debug!("incoming TCP connection...");
+            let peer_addr = stream.peer_addr();
+            if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
+                clients.lock().await.push(ws_stream);
+                log::debug!(
+                    "new WebSocket connection from {}",
+                    peer_addr.expect("peer addr expected")
+                );
+            }
+        }
+    }
+}
+
+fn ws_message<T: Serialize>(event_name: &str, data: T) -> String {
+    serde_json::json!({
+        "event": event_name,
+        "data": data,
+    })
+    .to_string()
+}
+
+/// Message handler loop that broadcasts messages to WebSocket clients
+pub async fn message_handler(mut rx: mpsc::Receiver<SammiMessage>, clients: Clients) {
     while let Some(message) = rx.recv().await {
-        match message {
-            SammiMessage::UpdateState(val) => {
-                let new_agent = agent.clone();
-                let val = serde_json::ser::to_string(&val).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_stateUpdate".into(),
-                    val,
-                    // timeout multiplied by 2 for other cases to ensure state updates timeout first
-                    config.timeout.abs(),
-                );
-            }
-            SammiMessage::PlayerHit(info) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&info).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_hitEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::ObjectCreated(name) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&name).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_objectCreatedEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::RoundStart => {
-                let new_agent = agent.clone();
-
-                // no roundstart info
-                send_event(
-                    new_agent,
-                    "ggxrd_roundStartEvent".into(),
-                    "{}".into(),
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::RoundEnd(info) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&info).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_roundEndEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
-            SammiMessage::ComboEnd(info) => {
-                let new_agent = agent.clone();
-                let info = serde_json::ser::to_string(&info).unwrap();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_comboEndEvent".into(),
-                    info,
-                    config.timeout.abs() * 2.0,
-                );
-            }
+        let message = match &message {
+            SammiMessage::UpdateState(val) => ws_message("ggxrd_stateUpdate", val),
+            SammiMessage::PlayerHit(info) => ws_message("ggxrd_hitEvent", info),
+            SammiMessage::ObjectCreated(name) => ws_message("ggxrd_objectCreatedEvent", name),
+            SammiMessage::RoundStart => ws_message("ggxrd_roundStartEvent", "{}"),
+            SammiMessage::RoundEnd(info) => ws_message("ggxrd_roundEndEvent", info),
+            SammiMessage::ComboEnd(info) => ws_message("ggxrd_comboEndEvent", info),
             SammiMessage::StateDeInitialized => {
-                let new_agent = agent.clone();
-
-                send_event(
-                    new_agent,
-                    "ggxrd_gamestateDeinitialized".into(),
-                    "{}".into(),
-                    config.timeout.abs() * 2.0,
-                );
+                ws_message("ggxrd_gamestateDeinitializedEvent", "{}")
             }
         };
+
+        let msg = Message::Text(message);
+
+        let mut locked_clients = clients.lock().await;
+        let mut active_clients = Vec::new();
+
+        // recreate list without clients who have disconnected
+        for mut client in locked_clients.drain(..) {
+            if client.send(msg.clone()).await.is_ok() {
+                active_clients.push(client);
+            } else {
+                log::warn!("Client disconnected");
+            }
+        }
+
+        *locked_clients = active_clients;
     }
 }
 

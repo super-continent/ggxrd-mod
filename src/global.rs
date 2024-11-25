@@ -8,7 +8,9 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{helpers, sammi};
+use crate::helpers;
+#[cfg(feature = "sammi")]
+use crate::sammi;
 
 pub type GlobalMut<T> = Lazy<Mutex<T>>;
 
