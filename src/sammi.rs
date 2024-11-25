@@ -71,6 +71,8 @@ impl Default for SammiConfig {
 pub struct SammiDevConfig {
     /// States which indicate an attack should be [`HitType::Throw`]
     throw_states: Vec<String>,
+    /// Object names that should not send a createObject event
+    ignored_objects: Vec<String>,
 }
 
 impl Default for SammiDevConfig {
@@ -111,7 +113,12 @@ impl Default for SammiDevConfig {
         ]
         .map(|s| s.to_string())
         .to_vec();
-        SammiDevConfig { throw_states }
+
+        let ignored_objects = ["BallZanzoh"].map(|s| s.to_string()).to_vec();
+        SammiDevConfig {
+            throw_states,
+            ignored_objects,
+        }
     }
 }
 
@@ -672,8 +679,9 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let object_name = process_string(&read_type::<[u8; 32]>(arg));
 
-    // keep venom from overloading the sammi connection
-    if object_name == "BallZanzoh" {
+    let config = SAMMI_CONFIG.get().unwrap();
+
+    if config.developer_data.ignored_objects.contains(&object_name) {
         return;
     }
 
