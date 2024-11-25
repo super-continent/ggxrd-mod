@@ -46,7 +46,6 @@ pub struct SammiConfig {
     pub websocket_ip: String,
     pub websocket_port: u16,
     pub state_update_hz: f32,
-    pub timeout: f32,
     pub developer_data: SammiDevConfig,
 }
 
@@ -57,7 +56,6 @@ impl Default for SammiConfig {
             websocket_ip: "0.0.0.0".into(),
             websocket_port: 6651,
             state_update_hz: 60.0,
-            timeout: 0.1,
             developer_data: SammiDevConfig::default(),
         }
     }
