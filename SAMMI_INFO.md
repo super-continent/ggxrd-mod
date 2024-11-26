@@ -34,7 +34,7 @@ Basic types:
 - `usize`: Unsigned integer (meaning it cannot be negative)
 - `isize`: Signed integer (can be negative or positive)
 - `String`: String of text in UTF-8
-- `bool`: A number where the value of `0` means false, and any other value means true
+- `bool`: Either true or false
 
 Sometimes a type is an enumeration of possible values, represented as different strings.
 The enum types are:
@@ -110,6 +110,7 @@ player_2: PlayerState,
 Contained object types:
 ```rs
 PlayerState {
+    game_inputs: GameInputs
     steam_id: String,
     steam_nickname: String,
     character: Character,
@@ -127,6 +128,30 @@ PlayerState {
     combo_counter: usize,
     x_position: isize,
     y_position: isize,
+    resource_1: isize,
+    resource_2: isize,
+    resource_3: isize,
+    resource_4: isize,
+}
+
+GameInputs {
+    // Directions
+    up: bool,
+    down: bool,
+    left: bool,
+    right: bool,
+    // Buttons
+    p: bool,
+    k: bool,
+    s: bool,
+    h: bool,
+    d: bool,
+    taunt: bool,
+    // MOM mode button
+    special: bool,
+    // Training mode buttons
+    replay: bool,
+    record: bool
 }
 ```
 
