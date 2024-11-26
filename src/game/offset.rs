@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 use once_cell::sync::Lazy;
+use serde::Deserialize;
+use serde::Serialize;
 ///! Offsets and AOB scan patterns to locate certain function in Xrd
 use sigscan::SigScan;
 
@@ -171,5 +173,64 @@ impl GameState {
 
     pub unsafe fn player_2(&self) -> GameObject {
         GameObject(self.0.offset(P2_OFFSET))
+    }
+}
+
+pub const INPUTS_OFFSET: Offset = Offset::new(0x1BF5E0C);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameInput {
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
+    pub p: bool,
+    pub k: bool,
+    pub s: bool,
+    pub h: bool,
+    pub d: bool,
+    pub taunt: bool,
+    pub special: bool,
+    pub replay: bool,
+    pub record: bool,
+}
+
+impl GameInput {
+    pub const fn new() -> Self {
+        Self {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            p: false,
+            k: false,
+            s: false,
+            h: false,
+            d: false,
+            taunt: false,
+            special: false,
+            replay: false,
+            record: false,
+        }
+    }
+
+    pub fn from_bits(bits: u16) -> Self {
+        let mut inputs = Self::new();
+
+        inputs.up = bits & 0x1 != 0;
+        inputs.down = bits & 0x2 != 0;
+        inputs.left = bits & 0x4 != 0;
+        inputs.right = bits & 0x8 != 0;
+        inputs.p = bits & 0x10 != 0;
+        inputs.k = bits & 0x20 != 0;
+        inputs.s = bits & 0x40 != 0;
+        inputs.h = bits & 0x80 != 0;
+        inputs.d = bits & 0x100 != 0;
+        inputs.taunt = bits & 0x200 != 0;
+        inputs.special = bits & 0x400 != 0;
+        inputs.replay = bits & 0x800 != 0;
+        inputs.record = bits & 0x1000 != 0;
+
+        inputs
     }
 }

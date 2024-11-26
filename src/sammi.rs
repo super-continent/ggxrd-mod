@@ -243,6 +243,7 @@ pub struct ObjectCreatedInfo {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PlayerState {
+    input_state: GameInput,
     steam_id: String,
     steam_nickname: String,
     character: Character,
@@ -269,6 +270,7 @@ pub struct PlayerState {
 impl PlayerState {
     const fn new() -> Self {
         Self {
+            input_state: GameInput::new(),
             steam_id: String::new(),
             steam_nickname: String::new(),
             character: Character::Sol,
@@ -455,6 +457,12 @@ pub unsafe fn game_loop_hook_sammi() {
         Character::from_number(gamestate.player_2().character() as usize);
 
     log::trace!("Collecting state data");
+
+    log::trace!("player inputs");
+    let bits = INPUTS_OFFSET.get_address() as *mut [u16; 2];
+
+    new_state.player_1.input_state = GameInput::from_bits((*bits)[0]);
+    new_state.player_2.input_state = GameInput::from_bits((*bits)[1]);
 
     // max with 0 and usize conversion ensures 0..MAX range
     log::trace!("health");
