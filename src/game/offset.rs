@@ -146,6 +146,7 @@ offset_struct! {
         x_position @ 0x24C: i32,
         y_position @ 0x250: i32,
         attack_level @ 0x450: u32,
+        attack_guard_type @ 0x57C: GuardType,
         recieved_hit_type @ 0x990: u32,
         health @ 0x9CC: i32,
         previous_state @ 0x2424: [u8; 32],
@@ -174,6 +175,15 @@ impl GameState {
     pub unsafe fn player_2(&self) -> GameObject {
         GameObject(self.0.offset(P2_OFFSET))
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[repr(u32)]
+pub enum GuardType {
+    Any = 0,
+    Overhead,
+    Low,
+    Unblockable,
 }
 
 pub const INPUTS_OFFSET: Offset = Offset::new(0x1BF5E0C);

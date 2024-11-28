@@ -68,6 +68,14 @@ The enum types are:
 'Answer'
 ```
 
+**GuardType**: The way a move can be guarded to block the move
+```js
+'Any'
+'Overhead'
+'Low'
+'Unblockable'
+```
+
 **HitType**: The type of hit a player recieved
 ```js
 'Normal'
@@ -163,6 +171,7 @@ current_frame: usize,
 hit_type: HitType,
 was_blocked: bool,
 attack_level: usize,
+attack_guard_type: GuardType,
 damage: usize,
 attacker: ObjectId,
 attacker_state: String,
