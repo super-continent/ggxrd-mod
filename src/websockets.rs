@@ -191,6 +191,7 @@ impl Character {
 #[derive(Serialize, Debug, Clone)]
 pub struct HitInfo {
     current_frame: usize,
+    game_state: GameStateInfo,
     hit_type: HitType,
     was_blocked: bool,
     attack_level: u32,
@@ -637,6 +638,7 @@ pub unsafe fn game_loop_hook_websockets() {
             tx.blocking_send(WebSocketsMessage::PlayerHit(HitInfo {
                 current_frame: CURRENT_FRAME,
                 hit_type,
+                game_state: new_state.clone(),
                 was_blocked,
                 victim: hit_event.victim_id,
                 attack_level: attack_lvl,
