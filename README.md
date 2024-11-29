@@ -1,11 +1,11 @@
-# Guilty Gear Rev2 Hook
+# Guilty Gear Rev2 Mod
 This project can be compiled into a dinput8.dll that goes next to `GuiltyGearXrd.exe`, it will now load an ImGui window and allow the user to enable/disable mods, and hide/show the UI with F1!
 
 # Installing
 Put the `dinput8.dll` inside your `<Steam Install Path>/Guilty Gear Xrd -REVELATOR-/Binaries/Win32/` folder and run the game. It should display windows overlaying the game.
 
-# SAMMI Integration
-This mod has support for integration with [SAMMI](https://sammi.solutions/), a streaming assistant that allows you to modify things like OBS layouts dynamically based on custom logic. For information on integrating your stream with Xrd, visit [the documentation](SAMMI_INFO.md), follow the linked guides, and read the information on what data is sent.
+# WebSockets/SAMMI Integration
+This mod has support for integration with WebSockets and an extension for [SAMMI](https://sammi.solutions/), a streaming assistant that allows you to modify things like OBS layouts dynamically based on custom logic. For information on integrating your stream with Xrd, visit [the documentation](SAMMI_INFO.md), follow the linked guides, and read the information on what data is sent.
 
 Note: can be disabled by compiling without the `sammi` feature.
 
