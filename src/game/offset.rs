@@ -146,6 +146,7 @@ offset_struct! {
         x_position @ 0x24C: i32,
         y_position @ 0x250: i32,
         attack_level @ 0x450: u32,
+        attack_info_bitfield @ 0x458: u32,
         attack_guard_type @ 0x57C: GuardType,
         recieved_hit_type @ 0x990: u32,
         health @ 0x9CC: i32,
