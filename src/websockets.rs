@@ -22,16 +22,16 @@ use crate::{
     steam,
 };
 
-/// The config for sammi options, taken from the full serialized rev2mod config
-static SAMMI_CONFIG: Lazy<OnceCell<SammiConfig>> =
-    Lazy::new(|| OnceCell::with_value(crate::global::CONFIG.lock().sammi.clone()));
+/// The config for websocket options, taken from the full serialized rev2mod config
+static WEBSOCKETS_CONFIG: Lazy<OnceCell<WebSocketsConfig>> =
+    Lazy::new(|| OnceCell::with_value(crate::global::CONFIG.lock().websockets.clone()));
 
-pub static SAMMI_ENABLED: AtomicBool = AtomicBool::new(true);
+pub static WEBSOCKETS_ENABLED: AtomicBool = AtomicBool::new(true);
 
-/// A message passed to the sammi event handler
+/// A message passed to the websockets event handler
 #[derive(Debug, Clone)]
-pub enum SammiMessage {
-    UpdateState(SammiState),
+pub enum WebSocketsMessage {
+    UpdateState(GameStateInfo),
     PlayerHit(HitInfo),
     ObjectCreated(ObjectCreatedInfo),
     RoundStart,
@@ -41,37 +41,37 @@ pub enum SammiMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SammiConfig {
-    pub sammi_enabled: bool,
+pub struct WebSocketsConfig {
+    pub websockets_enabled: bool,
     pub websocket_ip: String,
     pub websocket_port: u16,
     pub state_update_hz: f32,
-    pub developer_data: SammiDevConfig,
+    pub developer_data: WebSocketsDevConfig,
 }
 
-impl Default for SammiConfig {
+impl Default for WebSocketsConfig {
     fn default() -> Self {
         Self {
-            sammi_enabled: true,
+            websockets_enabled: true,
             websocket_ip: "0.0.0.0".into(),
             websocket_port: 6651,
             state_update_hz: 60.0,
-            developer_data: SammiDevConfig::default(),
+            developer_data: WebSocketsDevConfig::default(),
         }
     }
 }
 
 /// Options that may be changed in the case of a
-/// mod developer using SAMMI with modified state names
+/// mod developer using WebSockets with modified state names
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SammiDevConfig {
+pub struct WebSocketsDevConfig {
     /// States which indicate an attack should be [`HitType::Throw`]
     throw_states: Vec<String>,
     /// Object names that should not send a createObject event
     ignored_objects: Vec<String>,
 }
 
-impl Default for SammiDevConfig {
+impl Default for WebSocketsDevConfig {
     fn default() -> Self {
         let throw_states = [
             "Genrouzan",
@@ -111,7 +111,7 @@ impl Default for SammiDevConfig {
         .to_vec();
 
         let ignored_objects = ["BallZanzoh"].map(|s| s.to_string()).to_vec();
-        SammiDevConfig {
+        WebSocketsDevConfig {
             throw_states,
             ignored_objects,
         }
@@ -188,7 +188,7 @@ impl Character {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct HitInfo {
     current_frame: usize,
     hit_type: HitType,
@@ -308,7 +308,7 @@ pub struct ComboEndInfo {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct SammiState {
+pub struct GameStateInfo {
     current_frame: usize,
     rounds_to_win: u32,
     round_time_limit: u32,
@@ -317,7 +317,7 @@ pub struct SammiState {
     player_2: PlayerState,
 }
 
-impl SammiState {
+impl GameStateInfo {
     const fn new() -> Self {
         Self {
             current_frame: 0,
@@ -332,8 +332,8 @@ impl SammiState {
 
 type Clients = Arc<Mutex<Vec<tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>>>>;
 
-pub async fn start_websocket_server(rx: mpsc::Receiver<SammiMessage>) {
-    let config = SAMMI_CONFIG.get().unwrap();
+pub async fn start_websocket_server(rx: mpsc::Receiver<WebSocketsMessage>) {
+    let config = WEBSOCKETS_CONFIG.get().unwrap();
 
     let addr = format!("{}:{}", config.websocket_ip, config.websocket_port);
     let listener = TcpListener::bind(&addr)
@@ -349,7 +349,7 @@ pub async fn start_websocket_server(rx: mpsc::Receiver<SammiMessage>) {
 
     log::debug!("WebSocket server running at {}", addr);
 
-    tokio::try_join!(accept_handle, message_handle).expect("error in sammi tasks");
+    tokio::try_join!(accept_handle, message_handle).expect("error in websockets tasks");
 }
 
 async fn accept_connections(listener: TcpListener, clients: Clients) {
@@ -377,16 +377,16 @@ fn ws_message<T: Serialize>(event_name: &str, data: T) -> String {
 }
 
 /// Message handler loop that broadcasts messages to WebSocket clients
-pub async fn message_handler(mut rx: mpsc::Receiver<SammiMessage>, clients: Clients) {
+pub async fn message_handler(mut rx: mpsc::Receiver<WebSocketsMessage>, clients: Clients) {
     while let Some(message) = rx.recv().await {
         let message = match &message {
-            SammiMessage::UpdateState(val) => ws_message("ggxrd_stateUpdate", val),
-            SammiMessage::PlayerHit(info) => ws_message("ggxrd_hitEvent", info),
-            SammiMessage::ObjectCreated(name) => ws_message("ggxrd_objectCreatedEvent", name),
-            SammiMessage::RoundStart => ws_message("ggxrd_roundStartEvent", "{}"),
-            SammiMessage::RoundEnd(info) => ws_message("ggxrd_roundEndEvent", info),
-            SammiMessage::ComboEnd(info) => ws_message("ggxrd_comboEndEvent", info),
-            SammiMessage::StateDeInitialized => {
+            WebSocketsMessage::UpdateState(val) => ws_message("ggxrd_stateUpdate", val),
+            WebSocketsMessage::PlayerHit(info) => ws_message("ggxrd_hitEvent", info),
+            WebSocketsMessage::ObjectCreated(name) => ws_message("ggxrd_objectCreatedEvent", name),
+            WebSocketsMessage::RoundStart => ws_message("ggxrd_roundStartEvent", "{}"),
+            WebSocketsMessage::RoundEnd(info) => ws_message("ggxrd_roundEndEvent", info),
+            WebSocketsMessage::ComboEnd(info) => ws_message("ggxrd_comboEndEvent", info),
+            WebSocketsMessage::StateDeInitialized => {
                 ws_message("ggxrd_gamestateDeinitializedEvent", "{}")
             }
         };
@@ -425,8 +425,8 @@ static mut P2_STEAM_NAME: String = String::new();
 static mut CURRENT_FRAME: usize = 0;
 static mut FRAME_ACCUMULATOR: f32 = 0.0;
 
-static mut PREVIOUS_STATE: SammiState = SammiState::new();
-pub unsafe fn game_loop_hook_sammi() {
+static mut PREVIOUS_STATE: GameStateInfo = GameStateInfo::new();
+pub unsafe fn game_loop_hook_websockets() {
     let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
     if gamestate.is_null() {
@@ -434,7 +434,7 @@ pub unsafe fn game_loop_hook_sammi() {
         return;
     }
 
-    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
+    if !WEBSOCKETS_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -442,7 +442,7 @@ pub unsafe fn game_loop_hook_sammi() {
 
     CURRENT_FRAME += 1;
 
-    let mut new_state = SammiState::new();
+    let mut new_state = GameStateInfo::new();
 
     // get game state
     new_state.current_frame = CURRENT_FRAME;
@@ -588,7 +588,7 @@ pub unsafe fn game_loop_hook_sammi() {
         } else {
             RoundEndCause::Death
         };
-        tx.blocking_send(SammiMessage::RoundEnd(RoundEndInfo {
+        tx.blocking_send(WebSocketsMessage::RoundEnd(RoundEndInfo {
             current_frame: new_state.current_frame,
             winner,
             cause,
@@ -627,14 +627,14 @@ pub unsafe fn game_loop_hook_sammi() {
             // we can safely detect them by testing a timer since the state was entered for the value of 1
             //
             // states are also marked as Throw if they are inside the list of throw states in the config
-            let throw_states = &SAMMI_CONFIG.get().unwrap().developer_data.throw_states;
+            let throw_states = &WEBSOCKETS_CONFIG.get().unwrap().developer_data.throw_states;
 
             if throw_states.contains(&attacker_state) {
                 was_blocked = false;
                 hit_type = HitType::Throw;
             }
 
-            tx.blocking_send(SammiMessage::PlayerHit(HitInfo {
+            tx.blocking_send(WebSocketsMessage::PlayerHit(HitInfo {
                 current_frame: CURRENT_FRAME,
                 hit_type,
                 was_blocked,
@@ -653,7 +653,7 @@ pub unsafe fn game_loop_hook_sammi() {
     }
 
     // get config and check if we should update state depending on frameskip
-    let config = SAMMI_CONFIG.get().unwrap();
+    let config = WEBSOCKETS_CONFIG.get().unwrap();
     let update_t = 1.0 / config.state_update_hz.clamp(1.0, 60.0);
 
     let should_send = if FRAME_ACCUMULATOR > update_t {
@@ -664,7 +664,7 @@ pub unsafe fn game_loop_hook_sammi() {
     };
 
     if should_send {
-        tx.blocking_send(SammiMessage::UpdateState(new_state.clone()))
+        tx.blocking_send(WebSocketsMessage::UpdateState(new_state.clone()))
             .unwrap();
     }
 
@@ -673,7 +673,7 @@ pub unsafe fn game_loop_hook_sammi() {
 }
 
 pub unsafe fn round_begin() {
-    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
+    if !WEBSOCKETS_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -682,11 +682,11 @@ pub unsafe fn round_begin() {
     ROUND_OVER.store(false, Ordering::Relaxed);
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
-    tx.blocking_send(SammiMessage::RoundStart).unwrap();
+    tx.blocking_send(WebSocketsMessage::RoundStart).unwrap();
 }
 
 pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *mut u8) {
-    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
+    if !WEBSOCKETS_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -704,7 +704,7 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let object_name = process_string(&read_type::<[u8; 32]>(arg));
 
-    let config = SAMMI_CONFIG.get().unwrap();
+    let config = WEBSOCKETS_CONFIG.get().unwrap();
 
     if config.developer_data.ignored_objects.contains(&object_name) {
         return;
@@ -723,13 +723,13 @@ pub unsafe fn create_object_with_arg_hook(object: *mut u8, arg: *mut u8, _ptr: *
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
-    tx.blocking_send(SammiMessage::ObjectCreated(object_created_info))
+    tx.blocking_send(WebSocketsMessage::ObjectCreated(object_created_info))
         .unwrap();
 }
 
 // Must be called BEFORE the actual function runs and resets state.
 pub unsafe fn end_combo_hook(object: *mut u8) {
-    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
+    if !WEBSOCKETS_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -758,7 +758,7 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
-    tx.blocking_send(SammiMessage::ComboEnd(ComboEndInfo {
+    tx.blocking_send(WebSocketsMessage::ComboEnd(ComboEndInfo {
         current_frame: CURRENT_FRAME,
         victim,
         victim_state,
@@ -780,7 +780,7 @@ struct HitEventInfoInternal {
 static mut HIT_EVENT_INFO: Option<HitEventInfoInternal> = None;
 
 pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
-    if !SAMMI_ENABLED.load(Ordering::Relaxed) || attacker.is_null() || victim.is_null() {
+    if !WEBSOCKETS_ENABLED.load(Ordering::Relaxed) || attacker.is_null() || victim.is_null() {
         return;
     }
 
@@ -818,7 +818,7 @@ pub unsafe fn process_hit_hook(attacker: *mut u8, victim: *mut u8) {
 }
 
 pub unsafe fn deinit_gamestate_hook() {
-    if !SAMMI_ENABLED.load(Ordering::Relaxed) {
+    if !WEBSOCKETS_ENABLED.load(Ordering::Relaxed) {
         return;
     }
 
@@ -833,5 +833,6 @@ pub unsafe fn deinit_gamestate_hook() {
 
     let tx = global::MESSAGE_SENDER.get().unwrap().clone();
 
-    tx.blocking_send(SammiMessage::StateDeInitialized).unwrap();
+    tx.blocking_send(WebSocketsMessage::StateDeInitialized)
+        .unwrap();
 }

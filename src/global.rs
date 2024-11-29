@@ -9,13 +9,13 @@ use std::{
 };
 
 use crate::helpers;
-#[cfg(feature = "sammi")]
-use crate::sammi;
+#[cfg(feature = "websockets")]
+use crate::websockets;
 
 pub type GlobalMut<T> = Lazy<Mutex<T>>;
 
-#[cfg(feature = "sammi")]
-pub static MESSAGE_SENDER: OnceCell<tokio::sync::mpsc::Sender<sammi::SammiMessage>> =
+#[cfg(feature = "websockets")]
+pub static MESSAGE_SENDER: OnceCell<tokio::sync::mpsc::Sender<websockets::WebSocketsMessage>> =
     OnceCell::new();
 
 fn init_config() -> ModConfig {
@@ -83,8 +83,8 @@ pub struct ModConfig {
     pub dump_scripts: bool,
     pub log_level: log::LevelFilter,
 
-    #[cfg(feature = "sammi")]
-    pub sammi: sammi::SammiConfig,
+    #[cfg(feature = "websockets")]
+    pub websockets: websockets::WebSocketsConfig,
 }
 
 impl Default for ModConfig {
@@ -95,8 +95,8 @@ impl Default for ModConfig {
             dump_scripts: false,
             log_level: log::LevelFilter::Info,
 
-            #[cfg(feature = "sammi")]
-            sammi: sammi::SammiConfig::default(),
+            #[cfg(feature = "websockets")]
+            websockets: websockets::WebSocketsConfig::default(),
         }
     }
 }

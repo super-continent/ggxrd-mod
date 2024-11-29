@@ -4,8 +4,8 @@ use crate::global::GlobalMut;
 use crate::helpers::get_aob_offset;
 use crate::{global, make_fn};
 
-#[cfg(feature = "sammi")]
-use crate::sammi;
+#[cfg(feature = "websockets")]
+use crate::websockets;
 
 use std::ffi::CStr;
 use std::ptr;
@@ -22,7 +22,7 @@ static_detour! {
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
-#[cfg(feature = "sammi")]
+#[cfg(feature = "websockets")]
 static_detour! {
     static BOMRoundAndEasyResetInitializeHook: unsafe extern "thiscall" fn (*mut u8, bool);
     static CreateObjectWithArgHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, *mut u8);
@@ -57,13 +57,13 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         .initialize(load_bbscript_fn, load_script_hook)?
         .enable()?;
 
-    #[cfg(feature = "sammi")]
+    #[cfg(feature = "websockets")]
     {
         let activate_timer_fn = make_fn!(get_aob_offset(&offset::FN_ACTIVATE_TIMER).unwrap() => unsafe extern "thiscall" fn (*mut u8));
 
         ActivateTimerHook
             .initialize(activate_timer_fn, |obj| {
-                sammi::round_begin();
+                websockets::round_begin();
                 ActivateTimerHook.call(obj)
             })?
             .enable()?;
@@ -79,7 +79,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
                     arg as usize,
                     ptr as usize
                 );
-                sammi::create_object_with_arg_hook(object, arg, ptr);
+                websockets::create_object_with_arg_hook(object, arg, ptr);
                 CreateObjectWithArgHook.call(object, arg, ptr);
             })?
             .enable()?;
@@ -89,7 +89,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         log::debug!("end_combo: {:X}", end_combo_hook as usize);
         EndComboHook
             .initialize(end_combo_hook, |obj| {
-                sammi::end_combo_hook(obj);
+                websockets::end_combo_hook(obj);
                 EndComboHook.call(obj);
             })?
             .enable()?;
@@ -100,7 +100,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         ProcessHitHook
             .initialize(process_hit, |attacker, victim, unknown| {
                 ProcessHitHook.call(attacker, victim, unknown);
-                sammi::process_hit_hook(attacker, victim);
+                websockets::process_hit_hook(attacker, victim);
             })?
             .enable()?;
 
@@ -109,7 +109,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
         DeInitGameStateHook
             .initialize(deinit_gamestate, || {
-                sammi::deinit_gamestate_hook();
+                websockets::deinit_gamestate_hook();
                 DeInitGameStateHook.call()
             })?
             .enable()?;
@@ -124,10 +124,10 @@ unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
         other as usize,
     );
 
-    #[cfg(feature = "sammi")]
+    #[cfg(feature = "websockets")]
     {
-        log::trace!("gathering state for sammi...");
-        crate::sammi::game_loop_hook_sammi();
+        log::trace!("gathering state for websockets...");
+        crate::websockets::game_loop_hook_websockets();
     }
 
     GameStateAdvanceHook.call(game_state, other);

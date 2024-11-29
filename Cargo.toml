@@ -11,8 +11,8 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [features]
-sammi = ["tokio", "serde_json", "tokio-tungstenite"]
-default = ["sammi"]
+websockets = ["tokio", "serde_json", "tokio-tungstenite"]
+default = ["websockets"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }

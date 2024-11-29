@@ -2,10 +2,10 @@ mod error;
 mod game;
 mod global;
 mod helpers;
-#[cfg(feature = "sammi")]
-mod sammi;
 mod steam;
 mod ui;
+#[cfg(feature = "websockets")]
+mod websockets;
 
 use std::ffi::{CString, OsString};
 use std::fs::{self, File};
@@ -41,8 +41,8 @@ pub unsafe extern "stdcall" fn DllMain(
     libloaderapi::DisableThreadLibraryCalls(hinst_dll);
 
     if attach_reason == DLL_PROCESS_ATTACH {
-        // if sammi is used we set up the message passing state
-        #[cfg(feature = "sammi")]
+        // if websockets are enabled we set up the message passing state
+        #[cfg(feature = "websockets")]
         {
             let (tx, rx) = tokio::sync::mpsc::channel(8);
             global::MESSAGE_SENDER.get_or_init(move || tx);
@@ -54,11 +54,11 @@ pub unsafe extern "stdcall" fn DllMain(
                     .build()
                     .unwrap();
                 runtime.block_on(async move {
-                    sammi::start_websocket_server(rx).await;
+                    websockets::start_websocket_server(rx).await;
                 });
             });
         }
-        #[cfg(not(feature = "sammi"))]
+        #[cfg(not(feature = "websockets"))]
         {
             thread::spawn(|| unsafe { initialize() });
         }

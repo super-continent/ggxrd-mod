@@ -1,31 +1,33 @@
-# SAMMI Config and Webhook Data Guide
+# WebSockets Data Guide
 
 ## Before Using
-This document just specifies the information that will be sent to your SAMMI client.
-For learning how to set up SAMMI, check the [SAMMI Documentation](https://sammi.solutions/docs/).
-For learning how to set up SAMMI to process data from this mod, check out [Krackatoa's Guide](https://docs.google.com/document/d/1fFRs7567tCdn9gGu_4iLQM8tAB07vP8aDQeLaWrbqUg/).
+This document just specifies the information that will be sent to your WebSockets client.
 
-## SAMMI Mod Configuration
+You can use any WebSockets client to recieve this data, but most non-programmers will probably want to use SAMMI:
+- For learning how to set up SAMMI, check the [SAMMI Documentation](https://sammi.solutions/docs/).
+- For learning how to set up SAMMI to process data from this mod, check out [Krackatoa's Guide](https://docs.google.com/document/d/1fFRs7567tCdn9gGu_4iLQM8tAB07vP8aDQeLaWrbqUg/).
+
+## WebSockets Mod Configuration
 
 The mod contains a settings file `rev2mod_config.toml` that will be created when you launch the game with the mod.
-The default config SAMMI section will look like this:
+The default config section will look like this:
 
 ```toml
-[sammi]
-sammi_enabled = true
-webhook_url = 'http://127.0.0.1:9450/webhook'
-state_update_hz = 25.0
-timeout = 0.1
+[websockets]
+websockets_enabled = true
+websocket_ip = '0.0.0.0'
+websocket_port = 6651
+state_update_hz = 60.0
 ```
 
-- `sammi_enabled`: Whether the mod sends any data to SAMMI.
-- `webhook_url`: URL to the SAMMI webhook endpoint that you want the mod to send data to
-- `state_update_hz`: Frequency of state information being send to your SAMMI endpoint, in Hz. Possible values range is `1.0`..`60.0`
-- `timeout`: Max possible latency a request to SAMMI can have in seconds. Events that are not `ggxrd_stateUpdate` will have double the timeout to send, to ensure state updates are dropped before any other important events.
+- `websockets_enabled`: Whether the mod sends any data over WebSockets.
+- `websocket_ip`: IP address to bind the WebSocket server to. Default is '0.0.0.0' which allows connections from any IP.
+- `websocket_port`: Port number to use for the WebSocket server. Default is 6651.
+- `state_update_hz`: Frequency of state information being sent over WebSockets, in Hz. Default is 60.0.
 
-## SAMMI Mod Event Data
+## WebSockets Mod Event Data
 
-Each event webhook request contains a `data` field, inside the `data` field, there is an `eventInfo` field containing all information relevant to the specific event. This section lists the structures of each `eventInfo` field, with respect the event being recieved.
+Each event sent to the WebSockets clients is a JSON object that contains 2 fields, an `event` field specifying the type of event, and a `data` field containing all the fields associated with the event.
 
 ## Data Types:
 Fields will have a type assigned to them, describing what kind of data is being sent
@@ -33,7 +35,7 @@ Fields will have a type assigned to them, describing what kind of data is being 
 Basic types:
 - `usize`: Unsigned integer (meaning it cannot be negative)
 - `isize`: Signed integer (can be negative or positive)
-- `String`: String of text in UTF-8
+- `String`: String of text
 - `bool`: Either true or false
 
 Sometimes a type is an enumeration of possible values, represented as different strings.
@@ -106,7 +108,7 @@ The enum types are:
 
 ### `ggxrd_stateUpdate`
 
-`eventInfo` fields:
+`data` fields:
 ```rs
 current_frame: usize,
 round_time_limit: usize,
@@ -165,9 +167,10 @@ GameInputs {
 
 ### `ggxrd_hitEvent`
 
-`eventInfo` fields:
+`data` fields:
 ```rs
 current_frame: usize,
+game_state: ggxrd_stateUpdate, // redundancy to make accessing game state easier
 hit_type: HitType,
 was_blocked: bool,
 attack_level: usize,
@@ -183,7 +186,7 @@ combo_length: usize,
 
 ### `ggxrd_objectCreatedEvent`
 
-`eventInfo` fields:
+`data` fields:
 ```rs
 current_frame: usize,
 object_name: String,
@@ -198,7 +201,7 @@ This even currently contains no data, and is only used to notify the beginning o
 
 ### `ggxrd_roundEndEvent`
 
-`eventInfo` fields:
+`data` fields:
 ```rs
 current_frame: usize,
 winner: Winner,
@@ -209,7 +212,7 @@ cause: RoundEndCause,
 
 Triggers after 2 or more hits combo a character
 
-`eventInfo` fields:
+`data` fields:
 ```rs
 current_frame: usize,
 combo_length: usize,

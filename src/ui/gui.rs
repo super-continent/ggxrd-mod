@@ -1,8 +1,8 @@
 use crate::game::offset::GameState;
 use crate::game::offset::GAMESTATE_PTR;
 use crate::global;
-#[cfg(feature = "sammi")]
-use crate::sammi;
+#[cfg(feature = "websockets")]
+use crate::websockets;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -93,10 +93,14 @@ pub fn ui_loop(ui: Ui) -> Ui {
                         config.dump_scripts = dump_scripts
                     };
 
-                    #[cfg(feature = "sammi")]
+                    #[cfg(feature = "websockets")]
                     {
-                        ui.checkbox("Enable SAMMI", &mut config.sammi.sammi_enabled);
-                        sammi::SAMMI_ENABLED.store(config.sammi.sammi_enabled, Ordering::Relaxed);
+                        ui.checkbox(
+                            "Enable WebSockets",
+                            &mut config.websockets.websockets_enabled,
+                        );
+                        websockets::WEBSOCKETS_ENABLED
+                            .store(config.websockets.websockets_enabled, Ordering::Relaxed);
                     }
                     if ui.button("Save Config") {
                         save_config(config.clone())
