@@ -5,7 +5,7 @@ This document just specifies the information that will be sent to your WebSocket
 
 You can use any WebSockets client to recieve this data, but most non-programmers will probably want to use SAMMI:
 - For learning how to set up SAMMI, check the [SAMMI Documentation](https://sammi.solutions/docs/).
-- For learning how to set up SAMMI to process data from this mod, check out [Krackatoa's Guide](https://docs.google.com/document/d/1fFRs7567tCdn9gGu_4iLQM8tAB07vP8aDQeLaWrbqUg/).
+- The Xrd SAMMI extension by Krackatoa can be found [here](https://github.com/Krackatoa/Xrd-x-Sammi/).
 
 ## WebSockets Mod Configuration
 
