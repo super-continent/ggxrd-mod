@@ -91,6 +91,19 @@ unsafe fn initialize() {
         error!("PANIC: {}", panic_info.to_string())
     }));
 
+    const REDENGINE_INI_PATH: &str = "../../REDGame/Config/REDEngine.ini";
+
+    if let Ok(ini) = fs::read_to_string(REDENGINE_INI_PATH) {
+        let new_ini = if global::CONFIG.lock().skip_intro_movies {
+            ini.replace("bForceNoMovies=FALSE", "bForceNoMovies=TRUE")
+        } else {
+            ini.replace("bForceNoMovies=TRUE", "bForceNoMovies=FALSE")
+        };
+
+        let res = fs::write(REDENGINE_INI_PATH, new_ini);
+        debug!("Writing REDEngine.ini: {:?}", res);
+    }
+
     debug!(
         "Mods folder created: {}",
         fs::create_dir(global::DEFAULT_MODS_FOLDER).is_ok()

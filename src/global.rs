@@ -82,6 +82,7 @@ pub struct ModConfig {
     pub display_ui_on_start: bool,
     pub dump_scripts: bool,
     pub log_level: log::LevelFilter,
+    pub skip_intro_movies: bool,
 
     #[cfg(feature = "websockets")]
     pub websockets: websockets::WebSocketsConfig,
@@ -94,6 +95,7 @@ impl Default for ModConfig {
             display_ui_on_start: true,
             dump_scripts: false,
             log_level: log::LevelFilter::Info,
+            skip_intro_movies: true,
 
             #[cfg(feature = "websockets")]
             websockets: websockets::WebSocketsConfig::default(),
