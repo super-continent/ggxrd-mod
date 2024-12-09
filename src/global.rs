@@ -83,6 +83,7 @@ pub struct ModConfig {
     pub dump_scripts: bool,
     pub log_level: log::LevelFilter,
     pub skip_intro_movies: bool,
+    pub online_input_delay: u32,
 
     #[cfg(feature = "websockets")]
     pub websockets: websockets::WebSocketsConfig,
@@ -96,6 +97,7 @@ impl Default for ModConfig {
             dump_scripts: false,
             log_level: log::LevelFilter::Info,
             skip_intro_movies: true,
+            online_input_delay: 1,
 
             #[cfg(feature = "websockets")]
             websockets: websockets::WebSocketsConfig::default(),

@@ -20,6 +20,7 @@ static_detour! {
     static ControlBattleObjectHook: unsafe extern "thiscall" fn (*mut u8);
     static GameStateAdvanceHook: unsafe extern "thiscall" fn (*mut u8, *mut u8);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
+    static ConstructRollbackManagerHook: unsafe extern "thiscall" fn (*mut u8) -> *mut u8;
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 #[cfg(feature = "websockets")]
@@ -55,6 +56,24 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
     LoadBBScriptHook
         .initialize(load_bbscript_fn, load_script_hook)?
+        .enable()?;
+
+    let construct_rollback_manager_fn = make_fn!(get_aob_offset(&offset::FN_CONSTRUCT_ROLLBACK_MANAGER).unwrap() => unsafe extern "thiscall" fn (*mut u8) -> *mut u8);
+
+    log::debug!("construct_rollback_manager: {:X}", construct_rollback_manager_fn as usize);
+
+    ConstructRollbackManagerHook
+        .initialize(construct_rollback_manager_fn, |x| {
+            let manager = ConstructRollbackManagerHook.call(x);
+
+            let delay_value = global::CONFIG.lock().online_input_delay;
+
+            log::trace!("overwriting online manager at {:X} with delay field of {}", manager as usize, delay_value.min(4));
+            let delay = manager.offset(0x1CEC) as *mut u32;
+            delay.write(delay_value);
+
+            manager
+        })?
         .enable()?;
 
     #[cfg(feature = "websockets")]

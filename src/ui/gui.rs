@@ -1,5 +1,6 @@
 use crate::game::offset::GameState;
 use crate::game::offset::GAMESTATE_PTR;
+use crate::game::offset::ROLLBACK_MANAGER;
 use crate::global;
 #[cfg(feature = "websockets")]
 use crate::websockets;
@@ -92,6 +93,23 @@ pub fn ui_loop(ui: Ui) -> Ui {
                     if ui.checkbox("Dump game scripts", &mut dump_scripts) {
                         config.dump_scripts = dump_scripts
                     };
+
+                    Slider::new("Online delay", 0, 4).build(&ui, &mut config.online_input_delay);
+
+                    unsafe {
+                        let rollback_manager = *(ROLLBACK_MANAGER.get_address() as *mut *mut u8);
+
+                        if !rollback_manager.is_null() {
+                            let delay = rollback_manager.offset(0x1CEC) as *mut u32;
+                            if config.online_input_delay != delay.read() {
+                                log::debug!(
+                                    "Overwriting online input delay to value: {}",
+                                    config.online_input_delay
+                                );
+                                delay.write(config.online_input_delay);
+                            }
+                        }
+                    }
 
                     #[cfg(feature = "websockets")]
                     {
