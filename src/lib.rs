@@ -18,12 +18,13 @@ use std::thread;
 #[macro_use]
 extern crate log;
 
+use hudhook::windows::Win32::Foundation::{BOOL, HINSTANCE, MAX_PATH, TRUE};
 use once_cell::sync::OnceCell;
 use simplelog::*;
+use winapi::shared::minwindef::{DWORD, HINSTANCE__, LPVOID};
 use winapi::{
     ctypes::c_void,
     shared::guiddef::REFIID,
-    shared::minwindef::*,
     shared::ntdef::HRESULT,
     shared::winerror,
     um::libloaderapi,
@@ -35,18 +36,16 @@ use winapi::{
 #[allow(non_snake_case)]
 pub unsafe extern "stdcall" fn DllMain(
     hinst_dll: HINSTANCE,
-    attach_reason: DWORD,
-    _: c_void,
+    attach_reason: u32,
+    _: *mut (),
 ) -> BOOL {
-    libloaderapi::DisableThreadLibraryCalls(hinst_dll);
-
     if attach_reason == DLL_PROCESS_ATTACH {
         // if websockets are enabled we set up the message passing state
         #[cfg(feature = "websockets")]
         {
             let (tx, rx) = tokio::sync::mpsc::channel(8);
             global::MESSAGE_SENDER.get_or_init(move || tx);
-            thread::spawn(|| unsafe { initialize() });
+            thread::spawn(move || unsafe { initialize(hinst_dll) });
 
             thread::spawn(move || {
                 let runtime = tokio::runtime::Builder::new_current_thread()
@@ -60,14 +59,14 @@ pub unsafe extern "stdcall" fn DllMain(
         }
         #[cfg(not(feature = "websockets"))]
         {
-            thread::spawn(|| unsafe { initialize() });
+            thread::spawn(|| unsafe { initialize(hinst_dll) });
         }
     };
 
     TRUE
 }
 
-unsafe fn initialize() {
+unsafe fn initialize(module: HINSTANCE) {
     let log_level = global::CONFIG.lock().log_level;
     // let log_level = LevelFilter::Trace;
     if let Ok(logfile) = File::create("rev2mod.log") {
@@ -111,13 +110,12 @@ unsafe fn initialize() {
 
     debug!("UI hooks initializing...");
 
-    let mut ui_result = ui::ui_hooks::init_ui();
-    while let Err(e) = ui_result {
-        error!("Initializing UI failed: {}", e);
-        thread::sleep(std::time::Duration::from_secs(5));
-        ui_result = ui::ui_hooks::init_ui();
+    let ui_result = ui::ui_hooks::init_ui(module);
+    if let Err(e) = ui_result {
+        info!("Failed to hook UI: {:?}", e);
+    } else {
+        info!("UI hook success!");
     }
-    info!("UI hook success!");
 
     info!("Initializing game hooks...");
     let game_result = game::hooks::init_game_hooks();
@@ -145,7 +143,7 @@ pub unsafe extern "stdcall" fn DirectInput8Create(
 
     // Load real dinput8.dll if not already loaded
 
-    let real_dinput8 = *REAL_DINPUT8_HANDLE.get_or_init(|| get_dinput8_handle()) as HINSTANCE;
+    let real_dinput8 = *REAL_DINPUT8_HANDLE.get_or_init(|| get_dinput8_handle()) as *mut HINSTANCE__;
 
     let dinput8create_fn_name =
         CString::new("DirectInput8Create").expect("CString::new(`DirectInput8Create`) failed");
@@ -161,7 +159,7 @@ pub unsafe extern "stdcall" fn DirectInput8Create(
 }
 
 unsafe fn get_dinput8_handle() -> u32 {
-    let mut buffer = [0u16; MAX_PATH];
+    let mut buffer = [0u16; MAX_PATH as usize];
     let written_wchars = GetSystemDirectoryW(buffer.as_mut_ptr(), MAX_PATH as u32);
 
     let system_directory = if written_wchars == 0 {

@@ -9,10 +9,10 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
-use imgui::*;
+use hudhook::imgui::*;
+use hudhook::ImguiRenderLoop;
 use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
-use winapi::um::winuser::*;
 
 // this should work because we initialize the config
 // before ever accessing DISPLAY_UI through the UI loop
@@ -30,21 +30,29 @@ fn save_config(config: global::ModConfig) {
         .unwrap_or_else(|e| error!("writing config: {}", e));
 }
 
-pub fn ui_loop(ui: Ui) -> Ui {
+pub struct XrdModUi;
+
+impl ImguiRenderLoop for XrdModUi {
+    fn render(&mut self, ui: &mut Ui) {
+        ui_loop(ui);
+    }
+}
+
+pub fn ui_loop(ui: &mut Ui) {
     let display_ui = DISPLAY_UI.load(Ordering::SeqCst);
     let mut config = global::CONFIG.lock();
 
-    if ui.is_key_index_pressed(VK_F1) {
+    if ui.is_key_pressed(Key::F1) {
         DISPLAY_UI.store(!display_ui, Ordering::SeqCst);
     }
 
     if !display_ui {
-        return ui;
+        return;
     }
 
-    Window::new("Pangaea's Rev2 Mod")
+    ui.window("Pangaea's Rev2 Mod")
         .size([300., 400.], Condition::FirstUseEver)
-        .build(&ui, || {
+        .build(|| {
             TabBar::new("Mods and Config").build(&ui, || {
                 TabItem::new("Config").build(&ui, || {
                     let mut mods_on = config.mods_enabled;
@@ -94,7 +102,7 @@ pub fn ui_loop(ui: Ui) -> Ui {
                         config.dump_scripts = dump_scripts
                     };
 
-                    Slider::new("Online delay", 0, 4).build(&ui, &mut config.online_input_delay);
+                    ui.slider("Online delay", 0, 4, &mut config.online_input_delay);
 
                     unsafe {
                         let rollback_manager = *(ROLLBACK_MANAGER.get_address() as *mut *mut u8);
@@ -133,12 +141,12 @@ pub fn ui_loop(ui: Ui) -> Ui {
         let gamestate = *(GAMESTATE_PTR.get_address() as *mut *mut u8);
 
         if gamestate.is_null() {
-            return ui;
+            return;
         }
 
         let gamestate = GameState(gamestate);
 
-        Window::new("Game State").build(&ui, || {
+        ui.window("Game State").build(|| {
             ui.text("P1 Tension Pulse");
             ProgressBar::new(
                 (gamestate.player_1().tension_pulse() as f32 + 25000.0) / (25000.0 + 25000.0),
@@ -154,6 +162,4 @@ pub fn ui_loop(ui: Ui) -> Ui {
             .build(&ui);
         });
     }
-
-    ui
 }

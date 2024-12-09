@@ -16,8 +16,6 @@ default = ["websockets"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }
-imgui-impl-win32-rs = { git = "https://github.com/super-continent/imgui-impl-win32-rs" }
-imgui-dx9-renderer = "0"
 winapi = { version = "0", features = [
     "minwindef",
     "consoleapi",
@@ -26,8 +24,9 @@ winapi = { version = "0", features = [
     "d3d9types",
     "ntdef",
     "psapi",
+    "winuser",
+    "processthreadsapi",
 ] }
-imgui = "0.8"
 retour = { version = "0.3", features = ["static-detour", "thiscall-abi"] }
 parking_lot = "0"
 log = { version = "0", features = ["serde"] }
@@ -47,3 +46,4 @@ tokio = { version = "1.39.1", features = [
 tokio-tungstenite = { version = "0.24.0", optional = true }
 steamworks-sys = "0.11.0"
 futures-util = "0.3.31"
+hudhook = "0.8.0"
