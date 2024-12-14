@@ -150,6 +150,7 @@ offset_struct! {
 
     struct GameObject {
         character @ 0x44: u32,
+        hitstop_left @ 0x1AC: u32,
         x_position @ 0x24C: i32,
         y_position @ 0x250: i32,
         attack_level @ 0x450: u32,
@@ -159,7 +160,8 @@ offset_struct! {
         health @ 0x9CC: i32,
         previous_state @ 0x2424: [u8; 32],
         current_state @ 0x2444: [u8; 32],
-        untechable_time @ 0x9808: u32,
+        blockstun_left @ 0x4D54: u32,
+        hitstun_left @ 0x9808: u32,
         recieved_combo_counter @ 0x9F28: u32,
         recieved_combo_damage @ 0x9F44: i32,
         recieved_damage @ 0x9F48: i32,

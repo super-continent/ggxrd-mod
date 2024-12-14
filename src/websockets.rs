@@ -251,7 +251,9 @@ pub struct PlayerState {
     steam_nickname: String,
     character: Character,
     health: u32,
-    untechable_time: u32,
+    hitstun_left: u32,
+    blockstun_left: u32,
+    hitstop_left: u32,
     tension_pulse: i32,
     tension: u32,
     burst: u32,
@@ -278,7 +280,9 @@ impl PlayerState {
             steam_nickname: String::new(),
             character: Character::Sol,
             health: 420,
-            untechable_time: 0,
+            hitstun_left: 0,
+            blockstun_left: 0,
+            hitstop_left: 0,
             tension_pulse: 0,
             tension: 0,
             burst: 0,
@@ -476,9 +480,17 @@ pub unsafe fn game_loop_hook_websockets() {
     new_state.player_1.tension_pulse = gamestate.player_1().tension_pulse();
     new_state.player_2.tension_pulse = gamestate.player_2().tension_pulse();
 
-    log::trace!("untechable time");
-    new_state.player_1.untechable_time = gamestate.player_1().untechable_time();
-    new_state.player_2.untechable_time = gamestate.player_2().untechable_time();
+    log::trace!("hitstun/untech time left");
+    new_state.player_1.hitstun_left = gamestate.player_1().hitstun_left();
+    new_state.player_2.hitstun_left = gamestate.player_2().hitstun_left();
+
+    log::trace!("blockstun left");
+    new_state.player_1.blockstun_left = gamestate.player_1().blockstun_left();
+    new_state.player_2.blockstun_left = gamestate.player_2().blockstun_left();
+
+    log::trace!("hitstop left");
+    new_state.player_1.hitstop_left = gamestate.player_1().hitstop_left();
+    new_state.player_2.hitstop_left = gamestate.player_2().hitstop_left();
 
     log::trace!("tension meter");
     new_state.player_1.tension = gamestate.player_1().tension_meter();
