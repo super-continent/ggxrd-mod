@@ -147,6 +147,28 @@ pub fn ui_loop(ui: &mut Ui) {
         let gamestate = GameState(gamestate);
 
         ui.window("Game State").build(|| {
+
+            
+            ui.text("P1 RISC");
+            ProgressBar::new((gamestate.player_1().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0))
+                .overlay_text(format!("{}/100", gamestate.player_1().risc_meter()))
+                .build(&ui);
+
+            ui.text("P2 RISC");
+            ProgressBar::new((gamestate.player_2().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0))
+                .overlay_text(format!("{}/100", gamestate.player_2().risc_meter()))
+                .build(&ui);
+
+            ui.text("P1 Tension");
+            ProgressBar::new(gamestate.player_1().tension_meter() as f32 / 10000.0)
+                .overlay_text(format!("{}/100", gamestate.player_1().tension_meter()))
+                .build(&ui);
+
+            ui.text("P2 Tension");
+            ProgressBar::new(gamestate.player_2().tension_meter() as f32 / 10000.0)
+                .overlay_text(format!("{}/100", gamestate.player_2().tension_meter()))
+                .build(&ui);
+
             ui.text("P1 Tension Pulse");
             ProgressBar::new(
                 (gamestate.player_1().tension_pulse() as f32 + 25000.0) / (25000.0 + 25000.0),
@@ -160,6 +182,27 @@ pub fn ui_loop(ui: &mut Ui) {
             )
             .overlay_text(format!("{}/25000", gamestate.player_2().tension_pulse()))
             .build(&ui);
+
+            ui.text("P1 Health");
+            ProgressBar::new(gamestate.player_1().health() as f32 / 420.0)
+                .overlay_text(format!("{}/420", gamestate.player_1().health()))
+                .build(&ui);
+
+            ui.text("P2 Health");
+            ProgressBar::new(gamestate.player_2().health() as f32 / 420.0)
+                .overlay_text(format!("{}/420", gamestate.player_2().health()))
+                .build(&ui);
+
+            ui.text(format!("P1 Stun: {}", gamestate.player_1().stun()));
+            ui.text(format!("P2 Stun: {}", gamestate.player_2().stun()));
+
+            ui.text("P1 Position:");
+            ui.text(format!(" X: {}", gamestate.player_1().x_position()));
+            ui.text(format!(" Y: {}", gamestate.player_1().y_position()));
+
+            ui.text("P2 Position:");
+            ui.text(format!(" X: {}", gamestate.player_2().x_position()));
+            ui.text(format!(" Y: {}", gamestate.player_2().y_position()));
         });
     }
 }
