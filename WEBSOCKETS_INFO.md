@@ -120,13 +120,15 @@ player_2: PlayerState,
 Contained object types:
 ```rs
 PlayerState {
-    game_inputs: GameInputs
+    input_state: GameInputs,
     steam_id: String,
     steam_nickname: String,
     character: Character,
     health: usize,
     tension_pulse: isize,
-    untechable_time: usize,
+    hitstun_left: usize,
+    blockstun_left: usize,
+    hitstop_left: usize,
     tension: isize,
     burst: isize,
     risc: isize,
