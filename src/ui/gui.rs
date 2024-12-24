@@ -151,22 +151,22 @@ pub fn ui_loop(ui: &mut Ui) {
             
             ui.text("P1 RISC");
             ProgressBar::new((gamestate.player_1().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0))
-                .overlay_text(format!("{}/100", gamestate.player_1().risc_meter()))
+                .overlay_text(format!("{}/12800", gamestate.player_1().risc_meter()))
                 .build(&ui);
 
             ui.text("P2 RISC");
             ProgressBar::new((gamestate.player_2().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0))
-                .overlay_text(format!("{}/100", gamestate.player_2().risc_meter()))
+                .overlay_text(format!("{}/12800", gamestate.player_2().risc_meter()))
                 .build(&ui);
 
             ui.text("P1 Tension");
             ProgressBar::new(gamestate.player_1().tension_meter() as f32 / 10000.0)
-                .overlay_text(format!("{}/100", gamestate.player_1().tension_meter()))
+                .overlay_text(format!("{}/10000", gamestate.player_1().tension_meter()))
                 .build(&ui);
 
             ui.text("P2 Tension");
             ProgressBar::new(gamestate.player_2().tension_meter() as f32 / 10000.0)
-                .overlay_text(format!("{}/100", gamestate.player_2().tension_meter()))
+                .overlay_text(format!("{}/10000", gamestate.player_2().tension_meter()))
                 .build(&ui);
 
             ui.text("P1 Tension Pulse");
