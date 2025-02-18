@@ -19,6 +19,7 @@ static_detour! {
     static LoadBBScriptHook: unsafe extern "thiscall" fn (*mut u8, *mut u8, u32);
     static ControlBattleObjectHook: unsafe extern "thiscall" fn (*mut u8);
     static GameStateAdvanceHook: unsafe extern "thiscall" fn (*mut u8, *mut u8);
+    static BattleHudAdvanceHook: unsafe extern "thiscall" fn (*mut u8);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
     static ConstructRollbackManagerHook: unsafe extern "thiscall" fn (*mut u8) -> *mut u8;
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
@@ -49,6 +50,26 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         })?
         .enable()?;
 
+    let battle_hud_advance_fn = make_fn!(get_aob_offset(&offset::FN_BATTLE_HUD_ADVANCE).unwrap() => unsafe extern "thiscall" fn (*mut u8));
+
+    log::debug!("battle_hud_advance: {:X}", battle_hud_advance_fn as usize);
+
+    BattleHudAdvanceHook
+        .initialize(battle_hud_advance_fn, |hud| {
+            BattleHudAdvanceHook.call(hud);
+            
+            let hud_flags = hud.offset(0x1D8);
+            // HUD toggle
+            let config = global::CONFIG.lock();
+            if config.enable_battle_hud {
+                *hud_flags |= 2;
+            } else {
+                *hud_flags &= !2;
+            }
+
+        })?
+        .enable()?;
+
     let load_bbscript_fn =
         make_fn!(get_aob_offset(&offset::FN_LOAD_BBSCRIPT).unwrap() => internal::FnLoadBBScript);
 
@@ -60,7 +81,10 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
     let construct_rollback_manager_fn = make_fn!(get_aob_offset(&offset::FN_CONSTRUCT_ROLLBACK_MANAGER).unwrap() => unsafe extern "thiscall" fn (*mut u8) -> *mut u8);
 
-    log::debug!("construct_rollback_manager: {:X}", construct_rollback_manager_fn as usize);
+    log::debug!(
+        "construct_rollback_manager: {:X}",
+        construct_rollback_manager_fn as usize
+    );
 
     ConstructRollbackManagerHook
         .initialize(construct_rollback_manager_fn, |x| {
@@ -68,7 +92,11 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
             let delay_value = global::CONFIG.lock().online_input_delay;
 
-            log::trace!("overwriting online manager at {:X} with delay field of {}", manager as usize, delay_value.min(4));
+            log::trace!(
+                "overwriting online manager at {:X} with delay field of {}",
+                manager as usize,
+                delay_value.min(4)
+            );
             let delay = manager.offset(0x1CEC) as *mut u32;
             delay.write(delay_value);
 

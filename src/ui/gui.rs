@@ -46,6 +46,10 @@ pub fn ui_loop(ui: &mut Ui) {
         DISPLAY_UI.store(!display_ui, Ordering::SeqCst);
     }
 
+    if ui.is_key_pressed(Key::F2) {
+        config.enable_battle_hud = !config.enable_battle_hud;
+    }
+
     if !display_ui {
         return;
     }
@@ -133,7 +137,11 @@ pub fn ui_loop(ui: &mut Ui) {
                     }
                 });
 
-                TabItem::new("Help").build(&ui, || ui.bullet_text("F1: Show/Hide menu"));
+                TabItem::new("Help").build(&ui, || {
+                    ui.text("Keybinds:");
+                    ui.bullet_text("F1: Show/Hide mod UI");
+                    ui.bullet_text("F2: Show/Hide Battle HUD");
+                });
             })
         });
 

@@ -47,3 +47,4 @@ tokio-tungstenite = { version = "0.24.0", optional = true }
 steamworks-sys = "0.11.0"
 futures-util = "0.3.31"
 hudhook = "0.8.0"
+concat-idents = "1.1.5"

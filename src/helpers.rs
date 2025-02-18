@@ -175,6 +175,15 @@ macro_rules! offset_struct {
                         ptr.read_unaligned()
                     }
                 )*
+
+                $(
+                    concat_idents::concat_idents!(fn_name = set_, $field_name {
+                        pub unsafe fn fn_name(&mut self, value: $field_type) {
+                            let ptr = self.0.offset($offset) as *mut $field_type;
+                            ptr.write_unaligned(value);
+                        }
+                    });
+                )*
             }
         )+
     };
