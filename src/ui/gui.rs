@@ -47,7 +47,7 @@ pub fn ui_loop(ui: &mut Ui) {
     }
 
     if ui.is_key_pressed(Key::F2) {
-        config.enable_battle_hud = !config.enable_battle_hud;
+        config.display_battle_hud = !config.display_battle_hud;
     }
 
     if !display_ui {
@@ -63,6 +63,7 @@ pub fn ui_loop(ui: &mut Ui) {
                     let mut startup_ui = config.display_ui_on_start;
                     let mut dump_scripts = config.dump_scripts;
                     let mut selected_path = SELECTED_FOLDER.load(Ordering::SeqCst);
+                    let mut display_battle_hud = config.display_battle_hud;
 
                     if ui.checkbox("Script mods enabled", &mut mods_on) {
                         config.mods_enabled = mods_on
@@ -107,6 +108,10 @@ pub fn ui_loop(ui: &mut Ui) {
                     };
 
                     ui.slider("Online delay", 0, 4, &mut config.online_input_delay);
+
+                    if ui.checkbox("Display battle HUD", &mut display_battle_hud) {
+                        config.display_battle_hud = display_battle_hud
+                    }
 
                     unsafe {
                         let rollback_manager = *(ROLLBACK_MANAGER.get_address() as *mut *mut u8);

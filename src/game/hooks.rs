@@ -61,11 +61,14 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
             let hud_flags = hud.offset(0x1D8);
             // HUD toggle
             let config = global::CONFIG.lock();
-            if config.enable_battle_hud {
+            if config.display_battle_hud {
                 *hud_flags |= 2;
             } else {
                 *hud_flags &= !2;
             }
+
+            // enable debug overlay
+            // *hud_flags |= 0b1000;
 
         })?
         .enable()?;

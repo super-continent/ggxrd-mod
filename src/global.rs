@@ -84,7 +84,7 @@ pub struct ModConfig {
     pub log_level: log::LevelFilter,
     pub skip_intro_movies: bool,
     pub online_input_delay: u32,
-    pub enable_battle_hud: bool,
+    pub display_battle_hud: bool,
 
     #[cfg(feature = "websockets")]
     pub websockets: websockets::WebSocketsConfig,
@@ -99,7 +99,7 @@ impl Default for ModConfig {
             log_level: log::LevelFilter::Info,
             skip_intro_movies: true,
             online_input_delay: 1,
-            enable_battle_hud: true,
+            display_battle_hud: true,
 
             #[cfg(feature = "websockets")]
             websockets: websockets::WebSocketsConfig::default(),
