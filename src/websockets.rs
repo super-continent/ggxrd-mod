@@ -46,6 +46,7 @@ pub struct WebSocketsConfig {
     pub websocket_ip: String,
     pub websocket_port: u16,
     pub state_update_hz: f32,
+    pub message_send_timeout: u64,
     pub developer_data: WebSocketsDevConfig,
 }
 
@@ -56,6 +57,7 @@ impl Default for WebSocketsConfig {
             websocket_ip: "0.0.0.0".into(),
             websocket_port: 6651,
             state_update_hz: 60.0,
+            message_send_timeout: 100, // ms
             developer_data: WebSocketsDevConfig::default(),
         }
     }
@@ -385,6 +387,7 @@ fn ws_message<T: Serialize>(event_name: &str, data: T) -> String {
 /// Message handler loop that broadcasts messages to WebSocket clients
 pub async fn message_handler(mut rx: mpsc::Receiver<WebSocketsMessage>, clients: Clients) {
     while let Some(message) = rx.recv().await {
+        let config = WEBSOCKETS_CONFIG.get().unwrap();
         let message = match &message {
             WebSocketsMessage::UpdateState(val) => ws_message("ggxrd_stateUpdate", val),
             WebSocketsMessage::PlayerHit(info) => ws_message("ggxrd_hitEvent", info),
@@ -404,7 +407,12 @@ pub async fn message_handler(mut rx: mpsc::Receiver<WebSocketsMessage>, clients:
 
         // recreate list without clients who have disconnected
         for mut client in locked_clients.drain(..) {
-            if client.send(msg.clone()).await.is_ok() {
+            // if the client doesn't respond to the send within the timeout, we consider them disconnected
+            let send_future = tokio::time::timeout(
+                std::time::Duration::from_millis(config.message_send_timeout),
+                client.send(msg.clone()),
+            );
+            if send_future.await.is_ok() {
                 active_clients.push(client);
             } else {
                 log::warn!("Client disconnected");

@@ -43,7 +43,9 @@ pub unsafe extern "stdcall" fn DllMain(
         // if websockets are enabled we set up the message passing state
         #[cfg(feature = "websockets")]
         {
-            let (tx, rx) = tokio::sync::mpsc::channel(8);
+            // channel has a buffer of 10, theoretically 5(?) events could  occur on the same frame at most
+            // which means this gives us ~10 frames of buffer in the worst case
+            let (tx, rx) = tokio::sync::mpsc::channel(50);
             global::MESSAGE_SENDER.get_or_init(move || tx);
             thread::spawn(move || unsafe { initialize(hinst_dll) });
 
