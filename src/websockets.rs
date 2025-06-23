@@ -412,10 +412,15 @@ pub async fn message_handler(mut rx: mpsc::Receiver<WebSocketsMessage>, clients:
                 std::time::Duration::from_millis(config.message_send_timeout),
                 client.send(msg.clone()),
             );
-            if send_future.await.is_ok() {
-                active_clients.push(client);
+            let timeout_result = send_future.await;
+
+            if let Ok(send_result) = timeout_result {
+                match send_result {
+                    Ok(_) => active_clients.push(client),
+                    Err(e) => log::warn!("Client disconnected: {}", e),
+                }
             } else {
-                log::warn!("Client disconnected");
+                log::warn!("Client timed out");
             }
         }
 
