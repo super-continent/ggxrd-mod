@@ -565,6 +565,9 @@ pub unsafe fn game_loop_hook_websockets() {
     log::trace!("steam player info");
     let online_info = *(ONLINE_MATCH_INFO.get_address() as *mut *mut u8);
 
+    let p1_replay_steamid = *(P1_REPLAY_STEAMID.get_address() as *const u64);
+    let p2_replay_steamid = *(P2_REPLAY_STEAMID.get_address() as *const u64);
+
     if !online_info.is_null() {
         let p1_steamid = read_type::<u64>(online_info.offset(0xA8));
         let p2_steamid = read_type::<u64>(online_info.offset(0xB0));
@@ -583,6 +586,21 @@ pub unsafe fn game_loop_hook_websockets() {
         new_state.player_1.steam_nickname = P1_STEAM_NAME.clone();
 
         new_state.player_2.steam_id = format!("{}", p2_steamid);
+        new_state.player_2.steam_nickname = P2_STEAM_NAME.clone();
+    } else if p1_replay_steamid != 0 && p2_replay_steamid != 0 {
+        if p1_replay_steamid != P1_LAST_STEAMID {
+            P1_LAST_STEAMID = p1_replay_steamid;
+            P1_STEAM_NAME = steam::get_name_from_id(p1_replay_steamid);
+        }
+        if p2_replay_steamid != P2_LAST_STEAMID {
+            P2_LAST_STEAMID = p2_replay_steamid;
+            P2_STEAM_NAME = steam::get_name_from_id(p2_replay_steamid);
+        }
+
+        new_state.player_1.steam_id = format!("{}", p1_replay_steamid);
+        new_state.player_1.steam_nickname = P1_STEAM_NAME.clone();
+
+        new_state.player_2.steam_id = format!("{}", p2_replay_steamid);
         new_state.player_2.steam_nickname = P2_STEAM_NAME.clone();
     } else {
         new_state.player_1.steam_id = String::from("0");
