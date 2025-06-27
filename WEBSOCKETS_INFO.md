@@ -113,6 +113,7 @@ The enum types are:
 current_frame: usize,
 round_time_limit: usize,
 round_time_left: usize,
+rounds_to_win: usize,
 player_1: PlayerState,
 player_2: PlayerState,
 ```
