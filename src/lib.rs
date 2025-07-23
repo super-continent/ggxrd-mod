@@ -6,6 +6,7 @@ mod steam;
 mod ui;
 #[cfg(feature = "websockets")]
 mod websockets;
+mod sdk;
 
 use std::ffi::{CString, OsString};
 use std::fs::{self, File};
@@ -23,7 +24,6 @@ use once_cell::sync::OnceCell;
 use simplelog::*;
 use winapi::shared::minwindef::{DWORD, HINSTANCE__, LPVOID};
 use winapi::{
-    ctypes::c_void,
     shared::guiddef::REFIID,
     shared::ntdef::HRESULT,
     shared::winerror,
@@ -31,6 +31,8 @@ use winapi::{
     um::{consoleapi::AllocConsole, sysinfoapi::GetSystemDirectoryW},
     um::{unknwnbase::LPUNKNOWN, winnt::DLL_PROCESS_ATTACH},
 };
+
+use crate::sdk::ffi::find_globals;
 
 #[no_mangle]
 #[allow(non_snake_case)]
@@ -109,6 +111,12 @@ unsafe fn initialize(module: HINSTANCE) {
         "Mods folder created: {}",
         fs::create_dir(global::DEFAULT_MODS_FOLDER).is_ok()
     );
+
+    debug!("Initializing UE3 SDK...");
+    let sdk_result = find_globals();
+    if !sdk_result {
+        info!("Failed to find UE3 global variables! Some functionality will be disabled.");
+    }
 
     debug!("UI hooks initializing...");
 

@@ -2,23 +2,25 @@ use crate::game::offset::GameState;
 use crate::game::offset::GAMESTATE_PTR;
 use crate::game::offset::ROLLBACK_MANAGER;
 use crate::global;
+use crate::sdk;
+
 #[cfg(feature = "websockets")]
 use crate::websockets;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use hudhook::imgui::*;
 use hudhook::ImguiRenderLoop;
 use once_cell::sync::Lazy;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 // this should work because we initialize the config
 // before ever accessing DISPLAY_UI through the UI loop
 static DISPLAY_UI: Lazy<AtomicBool> =
     Lazy::new(|| AtomicBool::new(global::CONFIG.lock().display_ui_on_start));
 static SELECTED_FOLDER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
+static SELECTED_SCENE: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 
 fn save_config(config: global::ModConfig) {
     std::fs::File::create(global::CONFIG_PATH)
@@ -142,6 +144,63 @@ pub fn ui_loop(ui: &mut Ui) {
                     }
                 });
 
+                TabItem::new("Debug").build(&ui, || {
+                    let mut selected_scene = SELECTED_SCENE.load(Ordering::SeqCst);
+
+                    let scene_ids = [
+                        "DEBUGMENU",
+                        "DEBUG_CHARA_SELECT",
+                        "BATTLE",
+                        "TITLE",
+                        "CHARA_SELECT",
+                        "CHARA_INTRO",
+                        "STAGE_INTRO",
+                        "CONTINUE",
+                        "GAMEOVER",
+                        "TESTMODE",
+                        "BRIEFING",
+                        "INTERLUDE_DRAMA",
+                        "RANKING",
+                        "NEWS",
+                        "BATTLE_DIRECT",
+                        "ENDING",
+                        "OPENING_DRAMA",
+                        "NETWORK_MENU",
+                        "STORY_TOP",
+                        "STORY_MAIN",
+                        "DEBUGMAINMENU",
+                        "MAINMENU",
+                        "GALLERY",
+                        "LIBRARY",
+                        "REPLAY_MENU",
+                        "LOBBY",
+                        "FISHING",
+                        "ROOM",
+                        "DIGITALFIGURE",
+                        "STORY_STAFFROLL",
+                        "INTERLUDE_TO_BATTLE",
+                    ];
+
+                    if ui.combo_simple_string("Selected Scene", &mut selected_scene, &scene_ids) {
+                        SELECTED_SCENE.store(selected_scene, Ordering::SeqCst);
+                    }
+
+                    if ui.button("Change Scene") {
+                        sdk::ffi::change_scene(selected_scene as i32);
+                    }
+
+                    if ui.button("Enter Replay Menu") {
+                        let res = sdk::ffi::enter_replay();
+                        log::info!("entering replay: {}", res);
+                    }
+
+                    if ui.button("Toggle Debug Camera") {
+                        sdk::ffi::toggle_debug_camera(true);
+                    }
+
+                    ui.text(format!("Current Scene: {}", sdk::ffi::get_scene_id()));
+                });
+
                 TabItem::new("Help").build(&ui, || {
                     ui.text("Keybinds:");
                     ui.bullet_text("F1: Show/Hide mod UI");
@@ -160,17 +219,19 @@ pub fn ui_loop(ui: &mut Ui) {
         let gamestate = GameState(gamestate);
 
         ui.window("Game State").build(|| {
-
-            
             ui.text("P1 RISC");
-            ProgressBar::new((gamestate.player_1().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0))
-                .overlay_text(format!("{}/12800", gamestate.player_1().risc_meter()))
-                .build(&ui);
+            ProgressBar::new(
+                (gamestate.player_1().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0),
+            )
+            .overlay_text(format!("{}/12800", gamestate.player_1().risc_meter()))
+            .build(&ui);
 
             ui.text("P2 RISC");
-            ProgressBar::new((gamestate.player_2().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0))
-                .overlay_text(format!("{}/12800", gamestate.player_2().risc_meter()))
-                .build(&ui);
+            ProgressBar::new(
+                (gamestate.player_2().risc_meter() as f32 + 12800.0) / (12800.0 + 12800.0),
+            )
+            .overlay_text(format!("{}/12800", gamestate.player_2().risc_meter()))
+            .build(&ui);
 
             ui.text("P1 Tension");
             ProgressBar::new(gamestate.player_1().tension_meter() as f32 / 10000.0)
