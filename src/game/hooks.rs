@@ -22,6 +22,7 @@ static_detour! {
     static BattleHudAdvanceHook: unsafe extern "thiscall" fn (*mut u8);
     static SetupHook: unsafe extern "thiscall" fn (*mut u8);
     static ConstructRollbackManagerHook: unsafe extern "thiscall" fn (*mut u8) -> *mut u8;
+    static WritePlayerInputHook: unsafe extern "thiscall" fn (*mut u8, u16) -> *mut u16;
     //static ProcessEventHook: unsafe extern "stdcall" fn (*mut usize, *mut usize, *mut usize);
 }
 #[cfg(feature = "websockets")]
@@ -57,7 +58,7 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     BattleHudAdvanceHook
         .initialize(battle_hud_advance_fn, |hud| {
             BattleHudAdvanceHook.call(hud);
-            
+
             let hud_flags = hud.offset(0x1D8);
             // HUD toggle
             let config = global::CONFIG.lock();
@@ -69,7 +70,6 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
 
             // enable debug overlay
             // *hud_flags |= 0b1000;
-
         })?
         .enable()?;
 
@@ -106,6 +106,13 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
             manager
         })?
         .enable()?;
+
+    let write_player_input_fn = make_fn!(get_aob_offset(&offset::FN_WRITE_PLAYER_INPUT).unwrap() => unsafe extern "thiscall" fn (*mut u8, u16) -> *mut u16);
+
+    WritePlayerInputHook.initialize(write_player_input_fn, |input_ring, new_input| {
+        log::trace!("Pushing input to ring buffer");
+        WritePlayerInputHook.call(input_ring, new_input)
+    })?.enable()?;
 
     #[cfg(feature = "websockets")]
     {

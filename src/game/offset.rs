@@ -8,6 +8,14 @@ use sigscan::SigScan;
 use crate::helpers::offset_struct;
 use crate::helpers::Offset;
 
+pub const FN_WRITE_PLAYER_INPUT: Lazy<SigScan> = Lazy::new(|| {
+    SigScan::new_yara_style(concat!(
+        "66 ?? ?? ?? 66 ?? ?? 0f b7 ?? ?? 56 66 ?? ?? ?? ??",
+        "66 ?? ?? ?? 66 ?? ?? ?? ?? 74 41 40 66 ?? ?? ?? 66 ??",
+        "?? ?? 72 06 33 c0 66 ?? ?? ??"
+    ))
+});
+
 /// BattleState::ControlBattleObject(state *)
 pub const FN_CONTROL_BATTLE_OBJECT: Lazy<SigScan> = Lazy::new(|| {
     SigScan::new_yara_style(concat!(
