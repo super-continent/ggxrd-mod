@@ -2,7 +2,7 @@ use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::game::get_script_filename;
 use crate::global::GlobalMut;
 use crate::helpers::get_aob_offset;
-use crate::{global, make_fn};
+use crate::{global, make_fn, speedhack};
 
 #[cfg(feature = "websockets")]
 use crate::websockets;
@@ -115,6 +115,9 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     //         WritePlayerInputHook.call(input_ring, new_input)
     //     })?
     //     .enable()?;
+
+    log::debug!("enabling speedhack");
+    speedhack::initialize_speedhack()?;
 
     #[cfg(feature = "websockets")]
     {

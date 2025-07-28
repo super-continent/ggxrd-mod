@@ -4,6 +4,7 @@ use crate::game::offset::ROLLBACK_MANAGER;
 use crate::global;
 use crate::sdk;
 
+use crate::speedhack::update_speed;
 #[cfg(feature = "websockets")]
 use crate::websockets;
 
@@ -21,6 +22,7 @@ static DISPLAY_UI: Lazy<AtomicBool> =
     Lazy::new(|| AtomicBool::new(global::CONFIG.lock().display_ui_on_start));
 static SELECTED_FOLDER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 static SELECTED_SCENE: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
+static ENABLE_SPEEDHACK: AtomicBool = AtomicBool::new(false);
 
 fn save_config(config: global::ModConfig) {
     std::fs::File::create(global::CONFIG_PATH)
@@ -146,6 +148,7 @@ pub fn ui_loop(ui: &mut Ui) {
 
                 TabItem::new("Debug").build(&ui, || {
                     let mut selected_scene = SELECTED_SCENE.load(Ordering::SeqCst);
+                    let mut enable_speedhack = ENABLE_SPEEDHACK.load(Ordering::SeqCst);
 
                     let scene_ids = [
                         "DEBUGMENU",
@@ -187,6 +190,12 @@ pub fn ui_loop(ui: &mut Ui) {
 
                     if ui.button("Change Scene") {
                         sdk::ffi::change_scene(selected_scene as i32);
+                    }
+
+                    if ui.checkbox("Enable Speedhack", &mut enable_speedhack) {
+                        ENABLE_SPEEDHACK.store(enable_speedhack, Ordering::SeqCst);
+                        let new_speed = if enable_speedhack { 10.0 } else { 1.0 };
+                        unsafe { update_speed(new_speed) };
                     }
 
                     if ui.button("Enter Replay Menu") {

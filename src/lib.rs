@@ -7,6 +7,7 @@ mod ui;
 #[cfg(feature = "websockets")]
 mod websockets;
 mod match_recorder;
+mod speedhack;
 mod sdk;
 
 use std::ffi::{CString, OsString};

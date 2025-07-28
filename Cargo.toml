@@ -27,6 +27,7 @@ winapi = { version = "0", features = [
     "psapi",
     "winuser",
     "processthreadsapi",
+    "profileapi",
 ] }
 retour = { version = "0.3", features = ["static-detour", "thiscall-abi"] }
 parking_lot = "0"
