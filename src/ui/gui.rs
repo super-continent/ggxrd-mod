@@ -10,7 +10,7 @@ use crate::websockets;
 
 use std::borrow::Cow;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
 use hudhook::imgui::*;
 use hudhook::ImguiRenderLoop;
@@ -42,9 +42,71 @@ impl ImguiRenderLoop for XrdModUi {
     }
 }
 
+static PLAYING_REPLAYS: AtomicBool = AtomicBool::new(false);
+static CURRENT_REPLAY: AtomicI32 = AtomicI32::new(0);
+static mut PREVIOUS_GAMEMODE: usize = 0;
+static mut REPLAY_WAS_PLAYED: bool = false;
+static mut LATEST_REPLAY_WAS_SELECTED: bool = false;
+// some delay inbetween menu interactions is needed to prevent bugs
+static mut SELECTION_COUNTDOWN: usize = 0;
+fn handle_replay_playback() {
+    unsafe {
+        if sdk::ffi::get_scene_id() == 2 && PREVIOUS_GAMEMODE == 24 {
+            PREVIOUS_GAMEMODE = 2;
+            REPLAY_WAS_PLAYED = true;
+            LATEST_REPLAY_WAS_SELECTED = false;
+        }
+        if sdk::ffi::get_scene_id() == 24 && PLAYING_REPLAYS.load(Ordering::SeqCst) {
+            if PREVIOUS_GAMEMODE == 2 {
+                SELECTION_COUNTDOWN = 30;
+            }
+            PREVIOUS_GAMEMODE = 24;
+
+            if SELECTION_COUNTDOWN > 0 {
+                SELECTION_COUNTDOWN -= 1;
+            } else {
+                let current_replay = CURRENT_REPLAY.load(Ordering::SeqCst);
+
+                if REPLAY_WAS_PLAYED {
+                    REPLAY_WAS_PLAYED = false;
+                    CURRENT_REPLAY.store(current_replay + 1, Ordering::SeqCst);
+
+                    let list_len = sdk::ffi::replay_list_length();
+                    if current_replay + 1 == list_len && list_len != -1 {
+                        PLAYING_REPLAYS.store(false, Ordering::SeqCst);
+                        CURRENT_REPLAY.store(0, Ordering::SeqCst);
+                    }
+
+                    return;
+                }
+
+                if !LATEST_REPLAY_WAS_SELECTED {
+                    log::debug!("Selecting replay: {}", current_replay);
+                    let select_result = sdk::ffi::select_replay(current_replay);
+                    if 0 != select_result {
+                        log::debug!("Error selecting replay!");
+                        return;
+                    } else {
+                        log::debug!("Replay selected successfully");
+                        LATEST_REPLAY_WAS_SELECTED = true;
+                        SELECTION_COUNTDOWN = 15;
+                        return;
+                    }
+                }
+
+                SELECTION_COUNTDOWN = 60;
+                log::debug!("Starting replay");
+                sdk::ffi::start_replay();
+            }
+        }
+    }
+}
+
 pub fn ui_loop(ui: &mut Ui) {
     let display_ui = DISPLAY_UI.load(Ordering::SeqCst);
     let mut config = global::CONFIG.lock();
+
+    handle_replay_playback();
 
     if ui.is_key_pressed(Key::F1) {
         DISPLAY_UI.store(!display_ui, Ordering::SeqCst);
@@ -209,6 +271,10 @@ pub fn ui_loop(ui: &mut Ui) {
 
                     if ui.button("Toggle Debug Camera") {
                         sdk::ffi::toggle_debug_camera(true);
+                    }
+
+                    if ui.button("Play all replays") {
+                        PLAYING_REPLAYS.store(true, Ordering::SeqCst);
                     }
 
                     ui.text(format!("Current Scene: {}", sdk::ffi::get_scene_id()));
