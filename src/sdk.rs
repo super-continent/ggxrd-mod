@@ -18,9 +18,10 @@ pub mod ffi {
         fn enter_menu() -> i32;
         fn toggle_debug_menu() -> i32;
         fn change_scene(scene_id: i32) -> i32;
+        fn get_game_mode() -> i32;
         fn get_scene_id() -> i32;
         fn start_replay();
-        fn inc_replay_offset();
+        fn inc_replay_offset() -> i32;
         fn toggle_debug_camera(bDrawDebugText: bool) -> i32;
     }
 }

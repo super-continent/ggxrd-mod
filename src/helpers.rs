@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::{ffi::OsStr, mem};
@@ -104,6 +105,11 @@ pub unsafe fn get_aob_offset(pattern: &SigScan) -> Option<usize> {
     pattern
         .scan(scan_region)
         .map(|offset| offset + base as usize)
+}
+
+/// turn a string buf into String
+pub fn process_string(arr: &[u8]) -> String {
+    String::from(CStr::from_bytes_until_nul(arr).unwrap().to_str().unwrap())
 }
 
 pub unsafe fn call_wndproc(

@@ -6,6 +6,7 @@ mod steam;
 mod ui;
 #[cfg(feature = "websockets")]
 mod websockets;
+mod match_recorder;
 mod sdk;
 
 use std::ffi::{CString, OsString};

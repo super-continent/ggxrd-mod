@@ -125,13 +125,18 @@ int enter_menu() {
     return 0;
 }
 
-void inc_replay_offset() {
+int inc_replay_offset() {
     auto replay = GetInstanceOf<UREDGfxMoviePlayer_MenuReplay>();
     if (!replay) {
-        return;
+        return -1;
     }
-
-    replay->vRPLCurrentFactor += 1;
+    int num = replay->GetReplayListNum(replay->vRPLCurrentCategory);
+    if (num == replay->vRPLCurrentFactor + 1) {
+        return 0;
+    } else {
+        replay->vRPLCurrentFactor += 1;
+        return 1;
+    }
 }
 
 void start_replay() {
@@ -149,6 +154,15 @@ int get_scene_id() {
     }
 
     return static_cast<int>(GameCommon->SceneID);
+}
+
+int get_game_mode() {
+    auto GameCommon = GetInstanceOf<UREDGameCommon>();
+    if (!GameCommon) {
+        return -1;
+    }
+
+    return static_cast<int>(GameCommon->GetGameMode());
 }
 
 int change_scene(int scene_id)

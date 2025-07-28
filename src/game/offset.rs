@@ -171,18 +171,20 @@ offset_struct! {
         hitstop_left @ 0x1AC: u32,
         x_position @ 0x24C: i32,
         y_position @ 0x250: i32,
+        x_velocity @ 0x2FC: i32,
+        y_velocity @ 0x300: i32,
         attack_level @ 0x450: u32,
         attack_info_bitfield @ 0x458: u32,
         attack_guard_type @ 0x57C: GuardType,
-        recieved_hit_type @ 0x990: u32,
+        received_hit_type @ 0x990: u32,
         health @ 0x9CC: i32,
         previous_state @ 0x2424: [u8; 32],
         current_state @ 0x2444: [u8; 32],
         blockstun_left @ 0x4D54: u32,
         hitstun_left @ 0x9808: u32,
-        recieved_combo_counter @ 0x9F28: u32,
-        recieved_combo_damage @ 0x9F44: i32,
-        recieved_damage @ 0x9F48: i32,
+        received_combo_counter @ 0x9F28: u32,
+        received_combo_damage @ 0x9F44: i32,
+        received_damage @ 0x9F48: i32,
         stun @ 0x9FC4: i32,
         stun_resistance @ 0x9FC8: u32,
         tension_pulse @ 0x2D128: i32,
@@ -216,7 +218,7 @@ pub enum GuardType {
 
 pub const INPUTS_OFFSET: Offset = Offset::new(0x1BF5E0C);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GameInput {
     pub up: bool,
     pub down: bool,

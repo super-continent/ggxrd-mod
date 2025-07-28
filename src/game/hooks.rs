@@ -107,12 +107,14 @@ pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
         })?
         .enable()?;
 
-    let write_player_input_fn = make_fn!(get_aob_offset(&offset::FN_WRITE_PLAYER_INPUT).unwrap() => unsafe extern "thiscall" fn (*mut u8, u16) -> *mut u16);
+    // let write_player_input_fn = make_fn!(get_aob_offset(&offset::FN_WRITE_PLAYER_INPUT).unwrap() => unsafe extern "thiscall" fn (*mut u8, u16) -> *mut u16);
 
-    WritePlayerInputHook.initialize(write_player_input_fn, |input_ring, new_input| {
-        log::trace!("Pushing input to ring buffer");
-        WritePlayerInputHook.call(input_ring, new_input)
-    })?.enable()?;
+    // WritePlayerInputHook
+    //     .initialize(write_player_input_fn, |input_ring, new_input| {
+    //         log::trace!("Pushing input to ring buffer");
+    //         WritePlayerInputHook.call(input_ring, new_input)
+    //     })?
+    //     .enable()?;
 
     #[cfg(feature = "websockets")]
     {
@@ -185,6 +187,12 @@ unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
     {
         log::trace!("gathering state for websockets...");
         crate::websockets::game_loop_hook_websockets();
+    }
+
+    // 17 = replay mode
+    #[cfg(feature = "replay-data")]
+    if crate::sdk::ffi::get_game_mode() == 17 {
+        crate::match_recorder::record_replay_state();
     }
 
     GameStateAdvanceHook.call(game_state, other);

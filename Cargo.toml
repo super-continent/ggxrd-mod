@@ -12,7 +12,8 @@ crate-type = ["cdylib"]
 
 [features]
 websockets = ["tokio", "serde_json", "tokio-tungstenite"]
-default = ["websockets"]
+replay-data = ["serde_json"]
+default = ["websockets", "replay-data"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }

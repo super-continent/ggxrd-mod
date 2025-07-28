@@ -194,6 +194,10 @@ pub fn ui_loop(ui: &mut Ui) {
                         log::info!("entering replay: {}", res);
                     }
 
+                    if ui.button("Increment replay selection") {
+                        log::debug!("replay at end: {}", sdk::ffi::inc_replay_offset());
+                    }
+
                     if ui.button("Toggle Debug Camera") {
                         sdk::ffi::toggle_debug_camera(true);
                     }

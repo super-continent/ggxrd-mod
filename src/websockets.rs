@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::Message;
 use crate::{
     game::offset::*,
     global,
-    helpers::{read_type, Offset},
+    helpers::{process_string, read_type, Offset},
     steam,
 };
 
@@ -428,11 +428,6 @@ pub async fn message_handler(mut rx: mpsc::Receiver<WebSocketsMessage>, clients:
     }
 }
 
-// turn string buf into String
-fn process_string(arr: &[u8]) -> String {
-    String::from(CStr::from_bytes_until_nul(arr).unwrap().to_str().unwrap())
-}
-
 static ROUND_OVER: AtomicBool = AtomicBool::new(true);
 
 static mut P1_LAST_STEAMID: u64 = 0;
@@ -540,8 +535,8 @@ pub unsafe fn game_loop_hook_websockets() {
     // combo counters are actually held inside the opponent,
     // so we switch them to make the data easier to understand
     log::trace!("combo counter");
-    new_state.player_1.combo_counter = gamestate.player_2().recieved_combo_counter();
-    new_state.player_2.combo_counter = gamestate.player_1().recieved_combo_counter();
+    new_state.player_1.combo_counter = gamestate.player_2().received_combo_counter();
+    new_state.player_2.combo_counter = gamestate.player_1().received_combo_counter();
 
     log::trace!("X position");
     new_state.player_1.x_position = gamestate.player_1().x_position();
@@ -650,15 +645,15 @@ pub unsafe fn game_loop_hook_websockets() {
             let attacker = GameObject(hit_event.attacker);
             let victim = GameObject(hit_event.victim);
 
-            let mut hit_type = match victim.recieved_hit_type() {
+            let mut hit_type = match victim.received_hit_type() {
                 0 => HitType::Normal,
                 2 => HitType::Counter,
                 3 => HitType::MortalCounter,
                 _ => HitType::Unknown,
             };
 
-            let combo_length = victim.recieved_combo_counter();
-            let damage = victim.recieved_damage();
+            let combo_length = victim.received_combo_counter();
+            let damage = victim.received_damage();
             let mut was_blocked = combo_length == 0;
 
             let victim_state = process_string(&victim.current_state());
@@ -786,7 +781,7 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
 
     let gamestate = GameState(gamestate);
 
-    let combo_length = object.recieved_combo_counter();
+    let combo_length = object.received_combo_counter();
 
     if combo_length == 0 {
         return;
@@ -811,7 +806,7 @@ pub unsafe fn end_combo_hook(object: *mut u8) {
         victim_state,
         victim_previous_state,
         combo_length,
-        combo_damage: object.recieved_combo_damage(),
+        combo_damage: object.received_combo_damage(),
     }))
     .unwrap();
 }
