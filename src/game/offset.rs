@@ -152,6 +152,9 @@ pub const P2_REPLAY_STEAMID: Offset = Offset::new(0x19A23BC);
 
 pub const GAMESTATE_PTR: Offset = Offset::new(0x198B6E4);
 
+pub const ROUND_WINS_P1: Offset = Offset::new(0x19322F0);
+pub const ROUND_WINS_P2: Offset = Offset::new(0x19323A0);
+
 /// `[GAMESTATE_PTR]` offset to player 1
 pub const P1_OFFSET: isize = 0x169814;
 /// `[GAMESTATE_PTR]` offset to player 2

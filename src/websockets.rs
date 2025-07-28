@@ -264,7 +264,7 @@ pub struct PlayerState {
     stun_resistance: u32,
     state: String,
     previous_state: String,
-    round_wins: usize,
+    round_wins: u32,
     combo_counter: u32,
     x_position: i32,
     y_position: i32,
@@ -529,8 +529,8 @@ pub unsafe fn game_loop_hook_websockets() {
     new_state.player_2.previous_state = process_string(&gamestate.player_2().previous_state());
 
     log::trace!("round wins");
-    new_state.player_1.round_wins = *(Offset::new(0x19322F0).get_address() as *mut usize);
-    new_state.player_2.round_wins = *(Offset::new(0x19323A0).get_address() as *mut usize);
+    new_state.player_1.round_wins = *(ROUND_WINS_P1.get_address() as *mut u32);
+    new_state.player_2.round_wins = *(ROUND_WINS_P2.get_address() as *mut u32);
 
     // combo counters are actually held inside the opponent,
     // so we switch them to make the data easier to understand

@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     game::offset::{
-        GameInput, GameState, GAMESTATE_PTR, INPUTS_OFFSET, P1_REPLAY_STEAMID, P2_REPLAY_STEAMID,
+        GameInput, GameState, GAMESTATE_PTR, INPUTS_OFFSET, P1_REPLAY_STEAMID, P2_REPLAY_STEAMID, ROUND_WINS_P1,
     },
     helpers::process_string,
 };
@@ -29,6 +29,7 @@ struct MatchData {
 #[derive(Debug, Hash, Serialize)]
 struct MatchDataPoint {
     current_frame: u32,
+    rounds_to_win: u32,
     round_time_limit: u32,
     round_time_left: u32,
     player_1: PlayerState,
@@ -56,6 +57,7 @@ pub struct PlayerState {
     resource_2: i32,
     resource_3: i32,
     resource_4: i32,
+    round_wins: u32,
     inputs: GameInput,
 }
 
@@ -94,6 +96,9 @@ pub unsafe fn record_replay_state() {
 
     let input_bits = INPUTS_OFFSET.get_address() as *mut [u16; 2];
 
+    let round_wins_p1 = *(ROUND_WINS_P1.get_address() as *mut u32);
+    let round_wins_p2 = *(ROUND_WINS_P1.get_address() as *mut u32);
+
     let p1 = gs.player_1();
     let p2 = gs.player_2();
 
@@ -117,6 +122,7 @@ pub unsafe fn record_replay_state() {
         resource_2: p1.resource_2(),
         resource_3: p1.resource_3(),
         resource_4: p1.resource_4(),
+        round_wins: round_wins_p1,
         inputs: GameInput::from_bits((*input_bits)[0]),
     };
 
@@ -140,11 +146,13 @@ pub unsafe fn record_replay_state() {
         resource_2: p2.resource_2(),
         resource_3: p2.resource_3(),
         resource_4: p2.resource_4(),
+        round_wins: round_wins_p2,
         inputs: GameInput::from_bits((*input_bits)[1]),
     };
 
     let data_point = MatchDataPoint {
         current_frame: FRAME_TIMER,
+        rounds_to_win: gs.rounds_to_win(),
         round_time_left: gs.round_time_left(),
         round_time_limit: gs.round_time_limit(),
         player_1,
