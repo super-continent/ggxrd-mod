@@ -4,8 +4,12 @@ use parking_lot::Mutex;
 use serde::Serialize;
 
 use crate::{
-    game::offset::{
-        GameInput, GameState, GAMESTATE_PTR, INPUTS_OFFSET, P1_REPLAY_STEAMID, P2_REPLAY_STEAMID, ROUND_WINS_P1,
+    game::{
+        offset::{
+            GameInput, GameState, GAMESTATE_PTR, INPUTS_OFFSET, P1_REPLAY_STEAMID,
+            P2_REPLAY_STEAMID, ROUND_WINS_P1,
+        },
+        Character,
     },
     helpers::process_string,
 };
@@ -38,7 +42,7 @@ struct MatchDataPoint {
 
 #[derive(Debug, Hash, Serialize)]
 pub struct PlayerState {
-    character: u32,
+    character: Character,
     x_position: i32,
     y_position: i32,
     x_velocity: i32,
@@ -103,7 +107,7 @@ pub unsafe fn record_replay_state() {
     let p2 = gs.player_2();
 
     let player_1 = PlayerState {
-        character: p1.character(),
+        character: Character::from_number(p1.character() as usize),
         x_position: p1.x_position(),
         y_position: p1.y_position(),
         x_velocity: p1.x_velocity(),
@@ -127,7 +131,7 @@ pub unsafe fn record_replay_state() {
     };
 
     let player_2 = PlayerState {
-        character: p2.character(),
+        character: Character::from_number(p2.character() as usize),
         x_position: p2.x_position(),
         y_position: p2.y_position(),
         x_velocity: p2.x_velocity(),

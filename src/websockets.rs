@@ -16,7 +16,7 @@ use tokio::{
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
-    game::offset::*,
+    game::{offset::*, Character},
     global,
     helpers::{process_string, read_type, Offset},
     steam,
@@ -125,69 +125,6 @@ pub enum ObjectId {
     Player1,
     Player2,
     Projectile,
-}
-
-#[repr(u32)]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Character {
-    Sol = 0,
-    Ky,
-    May,
-    Millia,
-    Zato,
-    Potemkin,
-    Chipp,
-    Faust,
-    Axl,
-    Venom,
-    Slayer,
-    Ino,
-    Bedman,
-    Ramlethal,
-    Sin,
-    Elphelt,
-    Leo,
-    Johnny,
-    JackO,
-    Jam,
-    Haehyun,
-    Raven,
-    Dizzy,
-    Baiken,
-    Answer,
-}
-
-impl Character {
-    pub fn from_number(number: usize) -> Self {
-        match number {
-            0 => Character::Sol,
-            1 => Character::Ky,
-            2 => Character::May,
-            3 => Character::Millia,
-            4 => Character::Zato,
-            5 => Character::Potemkin,
-            6 => Character::Chipp,
-            7 => Character::Faust,
-            8 => Character::Axl,
-            9 => Character::Venom,
-            10 => Character::Slayer,
-            11 => Character::Ino,
-            12 => Character::Bedman,
-            13 => Character::Ramlethal,
-            14 => Character::Sin,
-            15 => Character::Elphelt,
-            16 => Character::Leo,
-            17 => Character::Johnny,
-            18 => Character::JackO,
-            19 => Character::Jam,
-            20 => Character::Haehyun,
-            21 => Character::Raven,
-            22 => Character::Dizzy,
-            23 => Character::Baiken,
-            24 => Character::Answer,
-            _ => panic!("Invalid character number: {}", number),
-        }
-    }
 }
 
 #[derive(Serialize, Debug, Clone)]
