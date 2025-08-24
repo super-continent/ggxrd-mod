@@ -23,6 +23,7 @@ static DISPLAY_UI: Lazy<AtomicBool> =
 static SELECTED_FOLDER: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 static SELECTED_SCENE: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 static ENABLE_SPEEDHACK: AtomicBool = AtomicBool::new(false);
+static DEBUG_STAGE_OVERRIDE: AtomicBool = AtomicBool::new(false);
 
 fn save_config(config: global::ModConfig) {
     std::fs::File::create(global::CONFIG_PATH)
@@ -107,6 +108,10 @@ pub fn ui_loop(ui: &mut Ui) {
     let mut config = global::CONFIG.lock();
 
     handle_replay_playback();
+
+    if DEBUG_STAGE_OVERRIDE.load(Ordering::SeqCst) {
+        sdk::ffi::set_selected_stage(100);
+    }
 
     if ui.is_key_pressed(Key::F1) {
         DISPLAY_UI.store(!display_ui, Ordering::SeqCst);
@@ -211,6 +216,7 @@ pub fn ui_loop(ui: &mut Ui) {
                 TabItem::new("Debug").build(&ui, || {
                     let mut selected_scene = SELECTED_SCENE.load(Ordering::SeqCst);
                     let mut enable_speedhack = ENABLE_SPEEDHACK.load(Ordering::SeqCst);
+                    let mut debug_stage_override = DEBUG_STAGE_OVERRIDE.load(Ordering::SeqCst);
 
                     let scene_ids = [
                         "DEBUGMENU",
@@ -256,8 +262,12 @@ pub fn ui_loop(ui: &mut Ui) {
 
                     if ui.checkbox("Enable Speedhack", &mut enable_speedhack) {
                         ENABLE_SPEEDHACK.store(enable_speedhack, Ordering::SeqCst);
-                        let new_speed = if enable_speedhack { 10.0 } else { 1.0 };
+                        let new_speed = if enable_speedhack { 5.0 } else { 1.0 };
                         unsafe { update_speed(new_speed) };
+                    }
+
+                    if ui.checkbox("Load Debug Stage", &mut debug_stage_override) {
+                        DEBUG_STAGE_OVERRIDE.store(debug_stage_override, Ordering::SeqCst);
                     }
 
                     if ui.button("Enter Replay Menu") {

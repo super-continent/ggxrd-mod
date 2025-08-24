@@ -202,6 +202,15 @@ int get_scene_id()
     return static_cast<int>(GameCommon->SceneID);
 }
 
+int set_selected_stage(int stage_id) {
+    auto StageSelect = GetInstanceOf<UREDGfxMoviePlayer_MenuStageSelect>();
+    if (!StageSelect) {
+        return -1;
+    }
+
+    StageSelect->StageCursor = stage_id;
+}
+
 int get_game_mode()
 {
     auto GameCommon = GetInstanceOf<UREDGameCommon>();
