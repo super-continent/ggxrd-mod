@@ -11,6 +11,7 @@ use crate::{
         },
         Character,
     },
+    global,
     helpers::process_string,
 };
 
@@ -169,6 +170,11 @@ pub unsafe fn record_replay_state() {
 
     if !ROUND_OVER && (gs.round_time_left() == 0 || p1.health() <= 0 || gs.player_2().health() <= 0)
     {
+        // only write to file if data recording is enabled
+        if !global::CONFIG.lock().enable_replay_data_recording {
+            return;
+        }
+
         ROUND_OVER = true;
         let mut hasher = DefaultHasher::new();
         replay_data.hash(&mut hasher);
@@ -176,7 +182,6 @@ pub unsafe fn record_replay_state() {
 
         let m = serde_json::to_vec(&(*replay_data));
         if let Ok(mut data) = m {
-            // INSERT_YOUR_CODE
             let replay_dir = std::path::Path::new("../../REPLAY_JSON");
             if !replay_dir.exists() {
                 if let Err(e) = std::fs::create_dir_all(replay_dir) {

@@ -174,10 +174,6 @@ pub fn ui_loop(ui: &mut Ui) {
                         config.dump_scripts = dump_scripts
                     };
 
-                    if ui.checkbox("Dump game scripts", &mut dump_scripts) {
-                        config.dump_scripts = dump_scripts
-                    };
-
                     ui.slider("Online delay", 0, 4, &mut config.online_input_delay);
 
                     if ui.checkbox("Display battle HUD", &mut display_battle_hud) {
@@ -217,6 +213,7 @@ pub fn ui_loop(ui: &mut Ui) {
                     let mut selected_scene = SELECTED_SCENE.load(Ordering::SeqCst);
                     let mut enable_speedhack = ENABLE_SPEEDHACK.load(Ordering::SeqCst);
                     let mut debug_stage_override = DEBUG_STAGE_OVERRIDE.load(Ordering::SeqCst);
+                    let mut enable_replay_data_recording = config.enable_replay_data_recording;
 
                     let scene_ids = [
                         "DEBUGMENU",
@@ -258,6 +255,10 @@ pub fn ui_loop(ui: &mut Ui) {
 
                     if ui.button("Change Scene") {
                         sdk::ffi::change_scene(selected_scene as i32);
+                    }
+
+                    if ui.checkbox("Enable Replay Data Recording", &mut enable_replay_data_recording) {
+                        config.enable_replay_data_recording = enable_replay_data_recording
                     }
 
                     if ui.checkbox("Enable Speedhack", &mut enable_speedhack) {
