@@ -1,14 +1,16 @@
+#[cfg(feature = "discord-presence")]
+mod discord_presence;
 mod error;
 mod game;
 mod global;
 mod helpers;
+mod match_recorder;
+mod sdk;
+mod speedhack;
 mod steam;
 mod ui;
 #[cfg(feature = "websockets")]
 mod websockets;
-mod match_recorder;
-mod speedhack;
-mod sdk;
 
 use std::ffi::{CString, OsString};
 use std::fs::{self, File};
@@ -155,7 +157,8 @@ pub unsafe extern "stdcall" fn DirectInput8Create(
 
     // Load real dinput8.dll if not already loaded
 
-    let real_dinput8 = *REAL_DINPUT8_HANDLE.get_or_init(|| get_dinput8_handle()) as *mut HINSTANCE__;
+    let real_dinput8 =
+        *REAL_DINPUT8_HANDLE.get_or_init(|| get_dinput8_handle()) as *mut HINSTANCE__;
 
     let dinput8create_fn_name =
         CString::new("DirectInput8Create").expect("CString::new(`DirectInput8Create`) failed");

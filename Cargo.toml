@@ -13,7 +13,8 @@ crate-type = ["cdylib"]
 [features]
 websockets = ["tokio", "serde_json", "tokio-tungstenite"]
 replay-data = ["serde_json"]
-default = ["websockets", "replay-data"]
+discord-presence = ["discord-rich-presence"]
+default = ["websockets", "replay-data", "discord-presence"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }
@@ -52,6 +53,7 @@ futures-util = "0.3.31"
 hudhook = "0.8"
 concat-idents = "1.1.5"
 cxx = "1.0"
+discord-rich-presence = { version = "1.0.0", optional = true }
 
 [build-dependencies]
 cxx-build = "1.0"

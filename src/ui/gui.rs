@@ -109,6 +109,11 @@ pub fn ui_loop(ui: &mut Ui) {
 
     handle_replay_playback();
 
+    #[cfg(feature = "discord-presence")]
+    unsafe {
+        crate::discord_presence::handle_discord_presence()
+    };
+
     if DEBUG_STAGE_OVERRIDE.load(Ordering::SeqCst) {
         sdk::ffi::set_selected_stage(100);
     }
@@ -257,7 +262,10 @@ pub fn ui_loop(ui: &mut Ui) {
                         sdk::ffi::change_scene(selected_scene as i32);
                     }
 
-                    if ui.checkbox("Enable Replay Data Recording", &mut enable_replay_data_recording) {
+                    if ui.checkbox(
+                        "Enable Replay Data Recording",
+                        &mut enable_replay_data_recording,
+                    ) {
                         config.enable_replay_data_recording = enable_replay_data_recording
                     }
 
@@ -289,6 +297,7 @@ pub fn ui_loop(ui: &mut Ui) {
                     }
 
                     ui.text(format!("Current Scene: {}", sdk::ffi::get_scene_id()));
+                    ui.text(format!("Current Gamemode: {}", sdk::ffi::get_game_mode()));
                 });
 
                 TabItem::new("Help").build(&ui, || {
