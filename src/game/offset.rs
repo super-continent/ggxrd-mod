@@ -145,6 +145,13 @@ pub const FN_DEINIT_GAMESTATE: Lazy<SigScan> = Lazy::new(|| {
     ))
 });
 
+pub const FN_APP_REALLOC: Lazy<SigScan> = Lazy::new(|| {
+    SigScan::new_yara_style(concat!(
+        "8b 0d ?? ?? ?? ?? 85 c9 75 0b e8 ?? ?? ?? ?? 8b 0d ?? ?? ?? ?? 8b 54 24 0c 8b 01 ",
+        "8b 40 0c 52 8b 54 24 0? 52 8b 54 24 0c 52 ff d0 c3"
+    ))
+});
+
 pub const ONLINE_MATCH_INFO: Offset = Offset::new(0x01737FC0);
 
 pub const P1_REPLAY_STEAMID: Offset = Offset::new(0x19A23B0);

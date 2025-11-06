@@ -1,4 +1,4 @@
-use super::{get_script_file, internal, names, offset, ScriptFile, ScriptType};
+use super::{get_script_file, get_collision_file, internal, names, offset, ScriptFile, ScriptType};
 use crate::game::get_script_filename;
 use crate::global::GlobalMut;
 use crate::helpers::get_aob_offset;
@@ -39,6 +39,7 @@ static MATCH_SCRIPTS: GlobalMut<BBScriptStorage> =
     Lazy::new(|| Mutex::new(BBScriptStorage::default()));
 static SCRIPT_LOAD_CALL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SCRIPT_LAST_CHARACTER: GlobalMut<ScriptFile> = Lazy::new(|| Mutex::new(ScriptFile::Sol));
+static mut APP_REALLOC: Option<internal::FnAppRealloc> = None;
 
 pub unsafe fn init_game_hooks() -> Result<(), retour::Error> {
     let gamestate_advance_fn = make_fn!(get_aob_offset(&offset::FN_GAMESTATE_ADVANCE).unwrap() => unsafe extern "thiscall" fn (*mut u8, *mut u8));
@@ -216,6 +217,7 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
 
     unsafe {
         let mut last_character = SCRIPT_LAST_CHARACTER.lock();
+        let prev_character = *last_character;
         let count = SCRIPT_LOAD_CALL_COUNTER.fetch_add(1, Ordering::SeqCst) % 6;
 
         let script_type = if (count % 2) == 0 {
@@ -309,6 +311,42 @@ fn load_script_hook(this: *mut u8, script_ptr: *mut u8, script_size: u32) {
 
         let mods_enabled = config.mods_enabled;
         debug!("Mods enabled: {}", mods_enabled);
+
+        if (count % 2) == 0 && mods_enabled && !(count == 2 && prev_character == *last_character) {
+            let collision = if count < 4 {
+                get_collision_file(*last_character)
+            } else {
+                get_collision_file(ScriptFile::Common)
+            };
+
+            if let Some(collision_unwrapped) = collision {
+                let mod_pointer = collision_unwrapped.as_ptr();
+                let mod_size = collision_unwrapped.len();
+
+                let asw_engine = this.sub((0x24 + count * 0x18) as usize);
+                let redpawn_player_ptr = asw_engine.add((0x4 + 0x1c4b6c + count * 4) as usize);
+                let redpawn_player = ptr::read_unaligned::<* mut u8>(redpawn_player_ptr as *const _);
+                let collision_ptr = redpawn_player.add((0x4a84) as usize);
+                let collision = ptr::read_unaligned::<* mut u8>(collision_ptr as *const _);
+                let topdata_ptr = collision.add((0x3c) as usize);
+                let datasize_ptr = collision.add((0x40) as usize);
+                let current_datasize = ptr::read_unaligned::<usize>(datasize_ptr as *mut usize);
+                let mut topdata = ptr::read_unaligned::<* mut u8>(topdata_ptr as *mut * mut u8);
+                if current_datasize < mod_size {
+                    if APP_REALLOC == None {
+                        let pattern = &offset::FN_APP_REALLOC;
+                        APP_REALLOC = Some(make_fn!(get_aob_offset(&offset::FN_APP_REALLOC).unwrap() => internal::FnAppRealloc));
+                    }
+                    let new_mem = APP_REALLOC.unwrap()(topdata as * mut u8, mod_size as u32, 8);
+                    if new_mem != ptr::null_mut::<u8>() {
+                        ptr::write_unaligned::<* mut u8>(topdata_ptr as *mut * mut u8, new_mem);
+                    }
+                    topdata = new_mem;
+                }
+                ptr::copy_nonoverlapping::<u8>(mod_pointer as *mut u8, topdata as *mut u8, mod_size);
+            }
+        }
+
         if mods_enabled {
             if let Some((mod_pointer, mod_size)) = script_storage.get_script_ptr(count) {
                 return LoadBBScriptHook.call(this, mod_pointer, mod_size);
