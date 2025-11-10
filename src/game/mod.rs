@@ -38,7 +38,7 @@ mod names {
     pub const ZATO: &[u8] = b"zat";
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScriptFile {
     Answer,
     Axl,
@@ -126,6 +126,23 @@ fn get_script_file(script_file: ScriptFile, file_type: ScriptType) -> Option<Vec
     if result.is_ok() {
         debug!("Got script `{}`", script_path.display());
         Some(script)
+    } else {
+        None
+    }
+}
+
+fn get_collision_file(collision_file: ScriptFile) -> Option<Vec<u8>> {
+    let mods_path = global::SELECTED_MOD_FOLDER.lock();
+
+    let file_name = format!("{}.collision", collision_file.short_name());
+    let collision_path = mods_path.join(file_name);
+
+    let mut collision = Vec::new();
+    let result = File::open(&collision_path).and_then(|mut file| file.read_to_end(&mut collision));
+
+    if result.is_ok() {
+        debug!("Got collision `{}`", collision_path.display());
+        Some(collision)
     } else {
         None
     }
