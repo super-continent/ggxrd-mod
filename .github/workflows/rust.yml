@@ -17,11 +17,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install Toolchain
-      run: rustup install nightly-2024-11-22-i686-pc-windows-msvc
+      run: rustup install nightly-2025-11-11-i686-pc-windows-msvc
     - name: Build
-      run: cargo +nightly-2024-11-22-i686-pc-windows-msvc build --release --verbose
+      run: cargo +nightly-2025-11-11-i686-pc-windows-msvc build --release --verbose
     - name: Run tests
-      run: cargo +nightly-2024-11-22-i686-pc-windows-msvc test --verbose
+      run: cargo +nightly-2025-11-11-i686-pc-windows-msvc test --verbose
     - name: Archive build artifacts
       uses: actions/upload-artifact@v4
       with:
