@@ -198,6 +198,11 @@ unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
         crate::match_recorder::record_replay_state();
     }
 
+    #[cfg(feature = "input-prediction")]
+    {
+        crate::input_prediction::handle_simulation_step();
+    }
+
     GameStateAdvanceHook.call(game_state, other);
 }
 

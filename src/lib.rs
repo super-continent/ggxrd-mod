@@ -11,6 +11,8 @@ mod steam;
 mod ui;
 #[cfg(feature = "websockets")]
 mod websockets;
+#[cfg(feature = "input-prediction")]
+mod input_prediction;
 
 use std::ffi::{CString, OsString};
 use std::fs::{self, File};
