@@ -15,7 +15,7 @@ websockets = ["tokio", "serde_json", "tokio-tungstenite"]
 replay-data = ["serde_json"]
 discord-presence = ["discord-rich-presence"]
 input-prediction = ["reqwest"]
-default = ["websockets", "replay-data", "discord-presence", "input-prediction"]
+default = ["websockets", "replay-data", "discord-presence"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }
