@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::time::Duration;
 
 use serde::Serialize;
 
@@ -6,16 +6,10 @@ use crate::game::offset::{
     GameInput, GameState, GAMESTATE_PTR, INPUTS_OFFSET, ROUND_WINS_P1, ROUND_WINS_P2,
 };
 
-#[derive(Debug, Serialize)]
-struct ContextWindow {
-    player_1_character: String,
-    player_2_character: String,
-    round_time_left: u32,
-    samples: VecDeque<DataPoint>,
-}
-
 #[derive(Clone, Debug, Serialize)]
 struct DataPoint {
+    round_time_left: u32,
+    player_1_character: String,
     player_1_x_position: i32,
     player_1_y_position: i32,
     player_1_x_velocity: i32,
@@ -41,6 +35,7 @@ struct DataPoint {
     player_1_input_s: bool,
     player_1_input_h: bool,
     player_1_input_d: bool,
+    player_2_character: String,
     player_2_x_position: i32,
     player_2_y_position: i32,
     player_2_x_velocity: i32,
@@ -67,13 +62,6 @@ struct DataPoint {
     player_2_input_h: bool,
     player_2_input_d: bool,
 }
-
-static mut CONTEXT_WINDOW: ContextWindow = ContextWindow {
-    player_1_character: String::new(),
-    player_2_character: String::new(),
-    round_time_left: 0,
-    samples: VecDeque::new(),
-};
 
 fn get_stick_direction(inputs: GameInput) -> usize {
     let mut stick_direction = 0;
@@ -114,6 +102,8 @@ pub unsafe fn handle_simulation_step() {
     let player_2_input_stick = get_stick_direction(player_2_inputs);
 
     let data_point = DataPoint {
+        round_time_left: gamestate.round_time_left(),
+        player_1_character: crate::game::Character::from_number(player_1.character() as usize).to_str().to_owned(),
         player_1_x_position: player_1.x_position(),
         player_1_y_position: player_1.y_position(),
         player_1_x_velocity: player_1.x_velocity(),
@@ -139,6 +129,7 @@ pub unsafe fn handle_simulation_step() {
         player_1_input_s: player_1_inputs.s,
         player_1_input_h: player_1_inputs.h,
         player_1_input_d: player_1_inputs.d,
+        player_2_character: crate::game::Character::from_number(player_2.character() as usize).to_str().to_owned(),
         player_2_x_position: player_2.x_position(),
         player_2_y_position: player_2.y_position(),
         player_2_x_velocity: player_2.x_velocity(),
@@ -166,32 +157,13 @@ pub unsafe fn handle_simulation_step() {
         player_2_input_d: player_2_inputs.d,
     };
 
-    CONTEXT_WINDOW.samples.push_back(data_point.clone());
-    CONTEXT_WINDOW.round_time_left = gamestate.round_time_left();
-    CONTEXT_WINDOW.player_1_character =
-        crate::game::Character::from_number(player_1.character() as usize)
-            .to_str()
-            .to_owned();
-    CONTEXT_WINDOW.player_2_character =
-        crate::game::Character::from_number(player_2.character() as usize)
-            .to_str()
-            .to_owned();
-
-    const CONTEXT_SIZE: usize = 10;
-    if CONTEXT_WINDOW.samples.len() > CONTEXT_SIZE {
-        CONTEXT_WINDOW.samples.pop_front();
-    } else if CONTEXT_WINDOW.samples.len() < CONTEXT_SIZE {
-        CONTEXT_WINDOW
-            .samples
-            .resize(CONTEXT_SIZE, data_point.clone());
-    }
-
-    let context_window_json = serde_json::to_string(&CONTEXT_WINDOW);
+    let context_window_json = serde_json::to_string(&data_point);
     if let Ok(context_window_json) = context_window_json {
         let res = reqwest::blocking::Client::new()
             .post("http://127.0.0.1:8000/input_prediction")
             .body(context_window_json)
             .header("Content-Type", "application/json")
+            .timeout(Duration::from_millis(3))
             .send();
         if let Err(e) = res {
             log::error!("Error sending context window to server: {}", e);
