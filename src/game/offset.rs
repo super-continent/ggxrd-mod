@@ -162,6 +162,7 @@ pub const P2_OFFSET: isize = 0x169814 + 0x2D198;
 
 offset_struct! {
     struct GameState {
+        entity_count @ 0xB4: u32,
         burst_meter_p1 @ 0x1C4B20: u32,
         burst_meter_p2 @ 0x1C4B24: u32,
         round_time_limit @ 0x1C71FC: u32,
@@ -170,6 +171,8 @@ offset_struct! {
     }
 
     struct GameObject {
+        // 0 = P1, 1 = P2, anything else = idk
+        player_number @ 0x40: u32,
         character @ 0x44: u32,
         hitstop_left @ 0x1AC: u32,
         x_position @ 0x24C: i32,
@@ -183,6 +186,7 @@ offset_struct! {
         health @ 0x9CC: i32,
         previous_state @ 0x2424: [u8; 32],
         current_state @ 0x2444: [u8; 32],
+        current_sprite @ 0xA58: [u8; 32],
         blockstun_left @ 0x4D54: u32,
         hitstun_left @ 0x9808: u32,
         received_combo_counter @ 0x9F28: u32,
@@ -197,6 +201,8 @@ offset_struct! {
         resource_2 @ 0x24CF0: i32,
         resource_3 @ 0x24D14: i32,
         resource_4 @ 0x24D5C: i32,
+        // memory slot 3 is used for character-specific purposes but often relates to installs
+        mem_3 @ 0x24C50: i32,
     }
 }
 
@@ -207,6 +213,11 @@ impl GameState {
 
     pub unsafe fn player_2(&self) -> GameObject {
         GameObject(self.0.offset(P2_OFFSET))
+    }
+
+    /// Get a pointer to the list of entities, size of the list is `entity_count`
+    pub unsafe fn entities_list(&self) -> *mut GameObject {
+        self.0.offset(0x1FC) as *mut GameObject
     }
 }
 

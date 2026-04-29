@@ -39,6 +39,7 @@ struct MatchDataPoint {
     round_time_left: u32,
     player_1: PlayerState,
     player_2: PlayerState,
+    entities: Vec<EntityState>,
 }
 
 #[derive(Debug, Hash, Serialize)]
@@ -55,6 +56,7 @@ pub struct PlayerState {
     risc: i32,
     stun: i32,
     state: String,
+    sprite: String,
     combo_counter: u32,
     hitstun_left: u32,
     blockstun_left: u32,
@@ -62,8 +64,20 @@ pub struct PlayerState {
     resource_2: i32,
     resource_3: i32,
     resource_4: i32,
+    mem_3: i32,
     round_wins: u32,
     inputs: GameInput,
+}
+
+#[derive(Debug, Hash, Serialize)]
+struct EntityState {
+    owner: String,
+    x_position: i32,
+    y_position: i32,
+    x_velocity: i32,
+    y_velocity: i32,
+    state: String,
+    sprite: String,
 }
 
 pub unsafe fn record_replay_state() {
@@ -120,6 +134,7 @@ pub unsafe fn record_replay_state() {
         risc: p1.risc_meter(),
         stun: p1.stun(),
         state: process_string(&p1.current_state()),
+        sprite: process_string(&p1.current_sprite()),
         combo_counter: p2.received_combo_counter(),
         hitstun_left: p1.hitstun_left(),
         blockstun_left: p1.blockstun_left(),
@@ -127,6 +142,7 @@ pub unsafe fn record_replay_state() {
         resource_2: p1.resource_2(),
         resource_3: p1.resource_3(),
         resource_4: p1.resource_4(),
+        mem_3: p1.mem_3(),
         round_wins: round_wins_p1,
         inputs: GameInput::from_bits((*input_bits)[0]),
     };
@@ -144,6 +160,7 @@ pub unsafe fn record_replay_state() {
         risc: p2.risc_meter(),
         stun: p2.stun(),
         state: process_string(&p2.current_state()),
+        sprite: process_string(&p2.current_sprite()),
         combo_counter: p1.received_combo_counter(),
         hitstun_left: p2.hitstun_left(),
         blockstun_left: p2.blockstun_left(),
@@ -151,9 +168,48 @@ pub unsafe fn record_replay_state() {
         resource_2: p2.resource_2(),
         resource_3: p2.resource_3(),
         resource_4: p2.resource_4(),
+        mem_3: p2.mem_3(),
         round_wins: round_wins_p2,
         inputs: GameInput::from_bits((*input_bits)[1]),
     };
+
+    // 2..count to skip player characters
+    let entities = (2..gs.entity_count())
+        .map(|i| {
+            log::debug!("entities: {}", gs.entity_count());
+            log::debug!("Gathering entity {} state...", i);
+            let entity = GameState(gamestate).entities_list().offset(i as isize);
+            let entity_ref = entity.read();
+
+            log::debug!("entity: {:X}", entity_ref.0 as usize);
+
+            log::debug!(
+                "entity sprite: {:?}",
+                entity_ref.current_sprite().map(|x| x as char)
+            );
+            log::debug!(
+                "entity state: {:?}",
+                entity_ref.current_state().map(|x| x as char)
+            );
+
+            let owner_str = match entity_ref.player_number() {
+                0 => "P1",
+                1 => "P2",
+                _ => "Other",
+            };
+
+            EntityState {
+                owner: owner_str.to_string(),
+                state: process_string(&entity_ref.current_state()),
+                sprite: process_string(&entity_ref.current_sprite()),
+                x_position: entity_ref.x_position(),
+                y_position: entity_ref.y_position(),
+                x_velocity: entity_ref.x_velocity(),
+                y_velocity: entity_ref.y_velocity(),
+            }
+        })
+        .filter(|x| x.sprite != "null") // we only want visible entities
+        .collect();
 
     let data_point = MatchDataPoint {
         current_frame: FRAME_TIMER,
@@ -162,6 +218,7 @@ pub unsafe fn record_replay_state() {
         round_time_limit: gs.round_time_limit(),
         player_1,
         player_2,
+        entities,
     };
 
     replay_data.match_frames.push(data_point);
@@ -182,16 +239,20 @@ pub unsafe fn record_replay_state() {
 
         let m = serde_json::to_vec(&(*replay_data));
         if let Ok(mut data) = m {
-            let replay_dir = std::path::Path::new("../../REPLAY_JSON");
-            if !replay_dir.exists() {
-                if let Err(e) = std::fs::create_dir_all(replay_dir) {
-                    log::error!("Couldn't create REPLAY_JSON directory: {}", e);
+            let data_dir = if crate::sdk::ffi::get_game_mode() == 17 {
+                std::path::Path::new("../../REPLAY_JSON")
+            } else {
+                std::path::Path::new("../../LOCAL_VS_JSON")
+            };
+
+            if !data_dir.exists() {
+                if let Err(e) = std::fs::create_dir_all(data_dir) {
+                    log::error!("Couldn't create data directory: {}", e);
                 }
             }
-            let write_result = std::fs::write(
-                format!("../../REPLAY_JSON/replay_{}.json", replay_hash),
-                &mut data,
-            );
+
+            let replay_path = data_dir.join(format!("replay_{}.json", replay_hash));
+            let write_result = std::fs::write(&replay_path, &mut data);
             if let Err(e) = write_result {
                 log::error!("Couldn't write match data: {}", e);
             }
