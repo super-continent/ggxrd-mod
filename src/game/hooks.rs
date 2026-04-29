@@ -192,9 +192,9 @@ unsafe fn gamestate_advance_hook(game_state: *mut u8, other: *mut u8) {
         crate::websockets::game_loop_hook_websockets();
     }
 
-    // 17 = replay mode
-    #[cfg(feature = "replay-data")]
-    if crate::sdk::ffi::get_game_mode() == 17 {
+    // 17 = replay mode, 5 = local VS
+    #[cfg(feature = "match-data-collection")]
+    if crate::sdk::ffi::get_game_mode() == 17 || crate::sdk::ffi::get_game_mode() == 5 {
         crate::match_recorder::record_replay_state();
     }
 

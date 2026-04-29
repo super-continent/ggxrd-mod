@@ -12,10 +12,11 @@ crate-type = ["cdylib"]
 
 [features]
 websockets = ["tokio", "serde_json", "tokio-tungstenite"]
-replay-data = ["serde_json"]
+match-data-collection = ["serde_json"]
 discord-presence = ["discord-rich-presence"]
 input-prediction = ["reqwest"]
-default = ["websockets", "replay-data", "discord-presence"]
+auto-replay-runner = []
+default = ["websockets", "match-data-collection", "discord-presence"]
 
 [dependencies]
 sigscan = { git = "https://github.com/super-continent/sigscan" }
