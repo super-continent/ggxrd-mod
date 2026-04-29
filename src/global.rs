@@ -86,8 +86,11 @@ pub struct ModConfig {
     pub online_input_delay: u32,
     pub display_battle_hud: bool,
 
-    #[cfg(feature = "replay-data")]
+    #[cfg(feature = "match-data-collection")]
     pub enable_replay_data_recording: bool,
+
+    #[cfg(feature = "auto-replay-runner")]
+    pub enable_auto_replay_runner: bool,
 
     // note: you must have primitive values above any "table" type values
     // putting any after the WebSocketsConfig struct will cause an error on Serialize
@@ -107,8 +110,11 @@ impl Default for ModConfig {
             online_input_delay: 1,
             display_battle_hud: true,
 
-            #[cfg(feature = "replay-data")]
+            #[cfg(feature = "match-data-collection")]
             enable_replay_data_recording: false,
+
+            #[cfg(feature = "auto-replay-runner")]
+            enable_auto_replay_runner: false,
 
             #[cfg(feature = "websockets")]
             websockets: websockets::WebSocketsConfig::default(),

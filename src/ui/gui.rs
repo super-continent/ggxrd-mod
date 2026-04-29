@@ -48,6 +48,8 @@ static CURRENT_REPLAY: AtomicI32 = AtomicI32::new(0);
 static mut PREVIOUS_GAMEMODE: usize = 0;
 static mut REPLAY_WAS_PLAYED: bool = false;
 static mut LATEST_REPLAY_WAS_SELECTED: bool = false;
+static mut REPLAY_START_PENDING: bool = false;
+
 // some delay inbetween menu interactions is needed to prevent bugs
 static mut SELECTION_COUNTDOWN: usize = 0;
 fn handle_replay_playback() {
@@ -70,12 +72,24 @@ fn handle_replay_playback() {
 
                 if REPLAY_WAS_PLAYED {
                     REPLAY_WAS_PLAYED = false;
+                    REPLAY_START_PENDING = false;
                     CURRENT_REPLAY.store(current_replay + 1, Ordering::SeqCst);
 
                     let list_len = sdk::ffi::replay_list_length();
                     if current_replay + 1 == list_len && list_len != -1 {
                         PLAYING_REPLAYS.store(false, Ordering::SeqCst);
                         CURRENT_REPLAY.store(0, Ordering::SeqCst);
+                        log::debug!("Finished playing all replays");
+                        #[cfg(feature = "auto-replay-runner")]
+                        {
+                            log::debug!(
+                                "Exiting game due to auto-replay-runner feature being enabled"
+                            );
+                            winapi::um::processthreadsapi::TerminateProcess(
+                                winapi::um::processthreadsapi::GetCurrentProcess(),
+                                0,
+                            );
+                        }
                     }
 
                     return;
@@ -95,9 +109,29 @@ fn handle_replay_playback() {
                     }
                 }
 
-                SELECTION_COUNTDOWN = 60;
-                log::debug!("Starting replay");
-                sdk::ffi::start_replay();
+                if !REPLAY_START_PENDING {
+                    log::debug!("Starting replay");
+                    sdk::ffi::start_replay();
+                    REPLAY_START_PENDING = true;
+                    SELECTION_COUNTDOWN = 60;
+                } else {
+                    // Replay start was already attempted but never progressed
+                    log::debug!(
+                        "Replay failed to start, this likely means there are no more replays."
+                    );
+                    // Optionally disable further attempts:
+                    PLAYING_REPLAYS.store(false, Ordering::SeqCst);
+
+                    #[cfg(feature = "auto-replay-runner")]
+                    {
+                        log::debug!("Exiting game due to auto-replay-runner feature being enabled");
+                        winapi::um::processthreadsapi::TerminateProcess(
+                            winapi::um::processthreadsapi::GetCurrentProcess(),
+                            0,
+                        );
+                    }
+                    return;
+                }
             }
         }
     }
@@ -108,6 +142,20 @@ pub fn ui_loop(ui: &mut Ui) {
     let mut config = global::CONFIG.lock();
 
     handle_replay_playback();
+
+    #[cfg(feature = "auto-replay-runner")]
+    unsafe {
+        if config.enable_auto_replay_runner {
+            if sdk::ffi::get_scene_id() == 3 {
+                sdk::ffi::enter_replay();
+            }
+            if sdk::ffi::get_scene_id() == 24 && !PLAYING_REPLAYS.load(Ordering::SeqCst) {
+                PLAYING_REPLAYS.store(true, Ordering::SeqCst);
+                ENABLE_SPEEDHACK.store(true, Ordering::SeqCst);
+                update_speed(4.0);
+            }
+        }
+    }
 
     #[cfg(feature = "discord-presence")]
     unsafe {
